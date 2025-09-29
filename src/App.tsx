@@ -101,11 +101,11 @@ export default function App() {
           </Stack>
 
           <Routes>
-            <Route path="/" element={<Navigate to="/historias_para_cassiie/library" replace />} />
-            <Route path="/historias_para_cassiie/library" element={<Library />} />
-            <Route path="/historias_para_cassiie/studio" element={<Studio />} />
-            <Route path="/historias_para_cassiie/export" element={<ExportPDF />} />
-            <Route path="/historias_para_cassiie/admin" element={<Admin />} />
+            <Route path="/" element={<Navigate to="/library" replace />} />
+            <Route path="/library" element={<Library />} />
+            <Route path="/studio" element={<Studio />} />
+            <Route path="/export" element={<ExportPDF />} />
+            <Route path="/admin" element={<Admin />} />
           </Routes>
         </Box>
       </Stack>

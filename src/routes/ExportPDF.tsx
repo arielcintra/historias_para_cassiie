@@ -111,7 +111,6 @@ export default function ExportPDF() {
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, md: 4 }}>
         <Stack spacing={2}>
-          {/* Seção de seleção múltipla */}
           <Paper 
             sx={{ 
               p: 3,
@@ -180,8 +179,6 @@ export default function ExportPDF() {
               📥 Baixar {selectedChapters.length} capítulos
             </Button>
           </Paper>
-
-          {/* Lista de capítulos para preview individual */}
           <Typography 
             variant="h6" 
             sx={{ 
@@ -274,7 +271,6 @@ export default function ExportPDF() {
                 bookId={activeBook.id} 
                 pageNumber={chapter.pageNumber} 
               />
-              {/* Mostrar stickers salvos */}
               {(() => {
                 const pdfCollages = JSON.parse(localStorage.getItem('pdf-collages') || '{}');
                 const savedCollage = pdfCollages[`${activeBook.id}-${chapter.id}`];
