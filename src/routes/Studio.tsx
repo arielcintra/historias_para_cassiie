@@ -85,7 +85,7 @@ export default function Studio() {
                 : "linear-gradient(45deg, #ec4899, #d946ef)",
               "&:hover": {
                 background: showStickerTray 
-                  ? "linear-gradient(45deg, #d97706, #f59e0b)" 
+                  ? "linear-gradient(45deg, #8f5ebaff, #b371d1ff)" 
                   : "linear-gradient(45deg, #be185d, #a21caf)",
                 transform: "translateY(-2px)",
               },
