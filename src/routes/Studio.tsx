@@ -120,7 +120,7 @@ export default function Studio() {
                 fontWeight: 600
               }}
             >
-              🗑️ Deletar Selecionado
+              Deletar Selecionado
             </Button>
           </Tooltip>
         </Stack>

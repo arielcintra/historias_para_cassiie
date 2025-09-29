@@ -19,6 +19,14 @@ interface EmojiData {
 }
 
 const FALLBACK_CATALOG = ["⭐", "💖", "🌙", "🚀", "☁️", "🪐"] as const;
+const POPULAR_CATEGORIES = [
+  "smileys-and-emotion",
+  "animals-and-nature", 
+  "food-and-drink",
+  "activities",
+  "travel-and-places",
+  "objects"
+];
 export default function StickerTray({
   onAdd,
 }: {
@@ -43,7 +51,12 @@ export default function StickerTray({
           throw new Error(`Erro ao carregar emojis: ${response}`);
 
         const data: EmojiData[] = await response.json();
-        const categoryEmojis = data.map((emoji) =>
+        
+        const filteredData = data.filter(emoji => 
+          POPULAR_CATEGORIES.includes(emoji.category)
+        );
+        
+        const categoryEmojis = filteredData.map((emoji) =>
           String.fromCodePoint(
             ...emoji.unicode.map((u) => parseInt(u.replace("U+", ""), 16))
           )
@@ -53,8 +66,8 @@ export default function StickerTray({
 
         setEmojis(allEmojis);
       } catch (err) {
-        console.error("Erro ao carregar emojis:", err);
-        setError("Erro ao carregar emojis");
+        console.error("Erro ao carregar stickers:", err);
+        setError("Erro ao carregar stickers");
         setEmojis([...FALLBACK_CATALOG]);
       } finally {
         setLoading(false);
@@ -75,14 +88,13 @@ export default function StickerTray({
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const svgAndPngContent = e.target?.result as string;
-      if (svgAndPngContent) {
-        const dataUrl = `data:image/svg+xml;image/png;base64,${btoa(svgAndPngContent)}`;
-        setCustomStickers(prev => [...prev, dataUrl]);
+      const result = e.target?.result as string;
+      if (result) {
+        setCustomStickers(prev => [...prev, result]);
         setError(null);
       }
     };
-    reader.readAsText(file);
+    reader.readAsDataURL(file);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -128,12 +140,12 @@ export default function StickerTray({
       <Paper sx={{ p: 1.5, overflowY: "auto", maxHeight: 200 }}>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           {allStickers.map((sticker, index) => {
-            const isCustomSvg = sticker.startsWith('data:image/svg+xml;image/png');
+            const isCustomImage = sticker.startsWith('data:image/');
             
             return (
               <Chip
                 key={`${sticker}-${index}`}
-                label={isCustomSvg ? (
+                label={isCustomImage ? (
                   <img 
                     src={sticker} 
                     alt="Custom sticker" 
