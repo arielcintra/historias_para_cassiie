@@ -1,0 +1,12 @@
+<svg width="400" height="600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="600" fill="#fff0f5" stroke="#333" stroke-width="2"/>
+  <text x="200" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#333">Jardim das Estrelas</text>
+  <text x="200" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#666">Capítulo 2</text>
+  <circle cx="200" cy="200" r="60" fill="#DDA0DD" opacity="0.7"/>
+  <circle cx="150" cy="180" r="25" fill="#98FB98" opacity="0.8"/>
+  <circle cx="250" cy="220" r="35" fill="#F0E68C" opacity="0.8"/>
+  <text x="50" y="350" font-family="Arial, sans-serif" font-size="14" fill="#333">A dança dos planetas começou</text>
+  <text x="50" y="370" font-family="Arial, sans-serif" font-size="14" fill="#333">quando o sol se pôs...</text>
+  <text x="50" y="410" font-family="Arial, sans-serif" font-size="14" fill="#333">Cada planeta girava graciosamente</text>
+  <text x="50" y="430" font-family="Arial, sans-serif" font-size="14" fill="#333">ao som de uma música celestial.</text>
+</svg>
