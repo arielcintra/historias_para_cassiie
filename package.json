@@ -2,6 +2,7 @@
   "name": "historinhas_para_cass",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://arielcintra.github.io/historias_para_cassiie",
   "dependencies": {
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.2",
