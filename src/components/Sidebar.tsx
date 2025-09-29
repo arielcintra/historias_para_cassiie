@@ -35,8 +35,8 @@ export default function Sidebar() {
       <List component="nav">
         <ListItemButton
           component={Link}
-          to="/library"
-          selected={active("/library")}
+          to="/historias_para_cassiie/library"
+          selected={active("/historias_para_cassiie/library")}
           sx={{ 
             color: "white",
             borderRadius: 2,
@@ -60,8 +60,8 @@ export default function Sidebar() {
         </ListItemButton>
         <ListItemButton
           component={Link}
-          to="/studio"
-          selected={active("/studio")}
+          to="/historias_para_cassiie/studio"
+          selected={active("/historias_para_cassiie/studio")}
           sx={{ 
             color: "white",
             borderRadius: 2,
@@ -85,8 +85,8 @@ export default function Sidebar() {
         </ListItemButton>
         <ListItemButton
           component={Link}
-          to="/export"
-          selected={active("/export")}
+          to="/historias_para_cassiie/export"
+          selected={active("/historias_para_cassiie/export")}
           sx={{ 
             color: "white",
             borderRadius: 2,

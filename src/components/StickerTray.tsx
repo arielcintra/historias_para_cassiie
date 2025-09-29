@@ -20,12 +20,14 @@ interface EmojiData {
 
 const FALLBACK_CATALOG = ["⭐", "💖", "🌙", "🚀", "☁️", "🪐"] as const;
 const POPULAR_CATEGORIES = [
+  "people-and-body",
   "smileys-and-emotion",
   "animals-and-nature", 
   "food-and-drink",
   "activities",
   "travel-and-places",
-  "objects"
+  "objects",
+  "skin-tones"
 ];
 export default function StickerTray({
   onAdd,
@@ -46,23 +48,22 @@ export default function StickerTray({
 
         const allEmojis: string[] = [];
 
-        const response = await fetch(`https://emojihub.yurace.pro/api/all`);
-        if (!response.ok)
-          throw new Error(`Erro ao carregar emojis: ${response}`);
-
-        const data: EmojiData[] = await response.json();
-        
-        const filteredData = data.filter(emoji => 
-          POPULAR_CATEGORIES.includes(emoji.category)
-        );
-        
-        const categoryEmojis = filteredData.map((emoji) =>
-          String.fromCodePoint(
-            ...emoji.unicode.map((u) => parseInt(u.replace("U+", ""), 16))
-          )
-        );
-
-        allEmojis.push(...categoryEmojis);
+        for (const category of POPULAR_CATEGORIES) {
+          try {
+            const response = await fetch(`https://emojihub.yurace.pro/api/all/category/${category}`);
+            if (response.ok) {
+              const data: EmojiData[] = await response.json();
+              const categoryEmojis = data.map((emoji) =>
+                String.fromCodePoint(
+                  ...emoji.unicode.map((u) => parseInt(u.replace("U+", ""), 16))
+                )
+              );
+              allEmojis.push(...categoryEmojis);
+            }
+          } catch (categoryErr) {
+            console.warn(`Erro ao carregar categoria ${category}:`, categoryErr);
+          }
+        }
 
         setEmojis(allEmojis);
       } catch (err) {

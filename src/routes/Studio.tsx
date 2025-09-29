@@ -39,7 +39,11 @@ export default function Studio() {
             variant="h6" 
             sx={{ 
               color: "#581c87",
-              fontWeight: 700
+              fontWeight: 700,
+              backgroundColor: "rgba(252, 231, 243, 0.5)",
+              px: 2,
+              py: 1,
+              borderRadius: 2
             }}
           >
             🎨 Editando: {chapter?.title ?? "—"}

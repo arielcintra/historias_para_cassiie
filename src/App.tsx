@@ -89,6 +89,11 @@ export default function App() {
               size="small"
               value={role}
               onChange={handleRoleChange}
+              sx={{
+                backgroundColor: "rgba(252, 231, 243, 0.5)",
+                borderRadius: 2,
+                p: 0.5
+              }}
             >
               <ToggleButton value="reader">Leitor</ToggleButton>
               <ToggleButton value="admin">Admin</ToggleButton>
@@ -96,11 +101,11 @@ export default function App() {
           </Stack>
 
           <Routes>
-            <Route path="/" element={<Navigate to="/library" replace />} />
-            <Route path="/library" element={<Library />} />
-            <Route path="/studio" element={<Studio />} />
-            <Route path="/export" element={<ExportPDF />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/" element={<Navigate to="/historias_para_cassiie/library" replace />} />
+            <Route path="/historias_para_cassiie/library" element={<Library />} />
+            <Route path="/historias_para_cassiie/studio" element={<Studio />} />
+            <Route path="/historias_para_cassiie/export" element={<ExportPDF />} />
+            <Route path="/historias_para_cassiie/admin" element={<Admin />} />
           </Routes>
         </Box>
       </Stack>
