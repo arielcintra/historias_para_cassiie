@@ -52,7 +52,7 @@ const theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         body: {
-          backgroundImage: "url(/images/background.png)",
+          backgroundImage: "url(" + process.env.PUBLIC_URL + "/images/background.png)",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "top",
