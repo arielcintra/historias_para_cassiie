@@ -78,7 +78,7 @@ export default function ExportPDF() {
     }
 
     if ('pageNumber' in chapter) {
-      const imagePath = `/books/${activeBook.id}/page-${chapter.pageNumber}.svg`;
+      const imagePath = `${process.env.PUBLIC_URL}/books/${activeBook.id}/page-${chapter.pageNumber}.svg`;
       const w = window.open("", "_blank")!;
       w.document.write(
         renderPrintablePDFHTML(
@@ -404,7 +404,7 @@ function renderMultipleChaptersHTML(
       const savedCollage = pdfCollages[`${bookId}-${chapter.id}`];
       collageToUse = savedCollage || chapter.collage;
       
-      const imagePath = `/books/${bookId}/page-${chapter.pageNumber}.svg`;
+      const imagePath = `${process.env.PUBLIC_URL}/books/${bookId}/page-${chapter.pageNumber}.svg`;
       const items = (collageToUse?.items ?? [])
         .map(
           (it) => {

@@ -34,7 +34,7 @@ export function usePDFBooks() {
       const books: PDFBook[] = booksConfig.map(config => ({
         id: config.id,
         title: config.title,
-        pdfPath: `/books/${config.id}.pdf`,
+        pdfPath: `${process.env.PUBLIC_URL}/books/${config.id}.pdf`,
         totalPages: config.pages,
         chapters: createChaptersFromPages(config.pages, config.id),
         type: 'pdf'

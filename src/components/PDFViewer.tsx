@@ -18,8 +18,8 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad }: PDFViewerP
         setLoading(true);
         setError('');
 
-        const svgPath = `/books/${bookId}/page-${pageNumber}.svg`;
-        const pngPath = `/books/${bookId}/page-${pageNumber}.png`;
+        const svgPath = `${process.env.PUBLIC_URL}/books/${bookId}/page-${pageNumber}.svg`;
+        const pngPath = `${process.env.PUBLIC_URL}/books/${bookId}/page-${pageNumber}.png`;
         
         const tryLoadImage = (path: string, fallbackPath?: string) => {
           const img = new Image();
