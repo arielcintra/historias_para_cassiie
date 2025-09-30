@@ -56,10 +56,15 @@ export default function Admin() {
     setUploadStatus("Analisando PDF...");
     
     try {
-      const totalPages = Math.floor(Math.random() * 10) + 5;
-      const bookTitle = file.name.replace('.pdf', '').replace(/[-_]/g, ' ');
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const totalPages = pdf.numPages;
       
-      const chapterTitles = Array.from({ length: totalPages }, (_, i) => `Capítulo ${i + 1}`);
+      const bookTitle = file.name.replace('.pdf', '').replace(/[-_]/g, ' ');
+      const chapterTitles = Array.from({ length: totalPages }, (_, i) => `Página ${i + 1}`);
       
       setPdfConfig({
         file,
@@ -70,6 +75,7 @@ export default function Admin() {
       
       setUploadStatus(`PDF analisado: ${totalPages} páginas detectadas`);
     } catch (error) {
+      console.error('Erro ao analisar PDF:', error);
       setUploadStatus(`Erro ao processar ${file.name}: ${error}`);
     }
   };
