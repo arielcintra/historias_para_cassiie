@@ -6,7 +6,7 @@ import React, {
   useState,
 } from "react";
 import { v4 as uuid } from "uuid";
-import type { Book, Collage, Role, TextBook, TextChapter } from "../types";
+import type { Book, Collage, Role, TextBook, TextChapter, PDFBook, PDFChapter } from "../types";
 import { usePDFBooks } from "../hooks/usePDFBooks.tsx";
 
 const LS_KEY = "celestial-books-mui-ts-v1";
@@ -20,13 +20,11 @@ const textSeed: TextBook[] = [
       {
         id: "c1",
         title: "Capítulo 1",
-        unlocked: true,
         text: "Era uma vez, em um céu de algodão, um foguete curioso...",
       },
       {
         id: "c2",
         title: "Capítulo 2",
-        unlocked: false,
         text: "A lua piscou para as estrelas e contou um segredo.",
       },
     ],
@@ -40,11 +38,15 @@ interface BooksContextShape {
   activeBookId?: string;
   setActiveBookId: (id: string) => void;
   activeBook?: Book;
-  unlockChapter: (chapterId: string) => void;
   saveCollage: (chapterId: string, collage?: Collage) => void;
   createBook: (
     title: string,
     chapters: Pick<TextChapter, "title" | "text">[]
+  ) => void;
+  createPDFBook: (
+    title: string,
+    totalPages: number,
+    chapterTitles?: string[]
   ) => void;
 }
 
@@ -64,13 +66,20 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
       return textSeed;
     }
   });
+  const [dynamicPdfBooks, setDynamicPdfBooks] = useState<PDFBook[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(LS_KEY) || "null")?.dynamicPdfBooks ?? [];
+    } catch {
+      return [];
+    }
+  });
   const [role, setRole] = useState<Role>("reader");
 
   const books = useMemo<Book[]>(() => {
-    const sortedPdfBooks = [...pdfBooks].sort((a, b) => a.id.localeCompare(b.id));
+    const sortedPdfBooks = [...pdfBooks, ...dynamicPdfBooks].sort((a, b) => a.id.localeCompare(b.id));
     const sortedTextBooks = [...textBooks].sort((a, b) => a.id.localeCompare(b.id));
     return [...sortedPdfBooks, ...sortedTextBooks];
-  }, [pdfBooks, textBooks]);
+  }, [pdfBooks, dynamicPdfBooks, textBooks]);
 
   const [activeBookId, setActiveBookId] = useState<string | undefined>();
 
@@ -84,32 +93,14 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
   }, [books, activeBookId]);
 
   useEffect(() => {
-    localStorage.setItem(LS_KEY, JSON.stringify({ textBooks }));
-  }, [textBooks]);
+    localStorage.setItem(LS_KEY, JSON.stringify({ textBooks, dynamicPdfBooks }));
+  }, [textBooks, dynamicPdfBooks]);
 
   const activeBook = useMemo(
     () => books.find((b) => b.id === activeBookId),
     [books, activeBookId]
   );
 
-  const unlockChapter = (chapterId: string) => {
-    if (!activeBookId || !activeBook) return;
-    
-    if (activeBook.type === 'text') {
-      setTextBooks((prev) =>
-        prev.map((b) =>
-          b.id !== activeBookId
-            ? b
-            : {
-                ...b,
-                chapters: b.chapters.map((c) =>
-                  c.id === chapterId ? { ...c, unlocked: true } : c
-                ),
-              }
-        )
-      );
-    }
-  };
 
   const saveCollage = (chapterId: string, collage?: Collage) => {
     if (!activeBookId || !activeBook) return;
@@ -151,11 +142,42 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
           id: `c${i + 1}`,
           title: c.title,
           text: c.text,
-          unlocked: i === 0,
         })
       ),
     };
     setTextBooks((prev) => [...prev, nb]);
+    setActiveBookId(nb.id);
+  };
+
+  const createPDFBook = (
+    title: string,
+    totalPages: number,
+    chapterTitles?: string[],
+    pdfFile?: File
+  ) => {
+    const bookId = `pdf-${uuid().slice(0, 8)}`;
+    const chapters: PDFChapter[] = [];
+    
+    for (let i = 1; i <= totalPages; i++) {
+      const chapterTitle = chapterTitles?.[i - 1] || `Capítulo ${i}`;
+      chapters.push({
+        id: `${bookId}-chapter-${i}`,
+        title: chapterTitle,
+        pageNumber: i,
+      });
+    }
+
+    const nb: PDFBook = {
+      id: bookId,
+      title,
+      pdfPath: `${process.env.PUBLIC_URL}/books/${bookId}.pdf`,
+      totalPages,
+      chapters,
+      type: 'pdf',
+      pdfFile,
+    };
+    
+    setDynamicPdfBooks((prev) => [...prev, nb]);
     setActiveBookId(nb.id);
   };
 
@@ -166,9 +188,9 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
     activeBookId,
     setActiveBookId,
     activeBook,
-    unlockChapter,
     saveCollage,
     createBook,
+    createPDFBook,
   };
   return <BooksCtx.Provider value={value}>{children}</BooksCtx.Provider>;
 }

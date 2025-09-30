@@ -12,6 +12,7 @@ import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 import BrushIcon from "@mui/icons-material/Brush";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import StarIcon from "@mui/icons-material/Star";
 import { Link, useLocation } from "react-router-dom";
 import { useBooks } from "../store/booksContext.tsx";
 
@@ -107,6 +108,31 @@ export default function Sidebar() {
             <PictureAsPdfIcon />
           </ListItemIcon>
           <ListItemText primary="Exportar PDF" />
+        </ListItemButton>
+        <ListItemButton
+          component={Link}
+          to="/task-notebook"
+          selected={active("/task-notebook")}
+          sx={{ 
+            color: "white",
+            borderRadius: 2,
+            mb: 0.5,
+            "&.Mui-selected": { 
+              backgroundColor: "rgba(255,255,255,0.25)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              "&:hover": { backgroundColor: "rgba(255,255,255,0.35)" }
+            },
+            "&:hover": { 
+              backgroundColor: "rgba(255,255,255,0.15)",
+              transform: "translateX(4px)",
+              transition: "all 0.2s ease"
+            }
+          }}
+        >
+          <ListItemIcon sx={{ color: "white" }}>
+            <StarIcon />
+          </ListItemIcon>
+          <ListItemText primary="Caderninho das Tarefas" />
         </ListItemButton>
       </List>
       <Divider sx={{ my: 2, borderColor: "rgba(255,255,255,0.4)" }} />

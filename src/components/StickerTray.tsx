@@ -20,14 +20,12 @@ interface EmojiData {
 
 const FALLBACK_CATALOG = ["⭐", "💖", "🌙", "🚀", "☁️", "🪐"] as const;
 const POPULAR_CATEGORIES = [
-  "people-and-body",
-  "smileys-and-emotion",
+  "smileys and people",
   "animals-and-nature", 
   "food-and-drink",
-  "activities",
   "travel-and-places",
-  "objects",
-  "skin-tones"
+  "activities",
+  "objects"
 ];
 export default function StickerTray({
   onAdd,

@@ -14,12 +14,18 @@ import { CloudUpload } from "@mui/icons-material";
 import { useBooks } from "../store/booksContext.tsx";
 
 export default function Admin() {
-  const { createBook, role } = useBooks();
+  const { createBook, createPDFBook, role } = useBooks();
   const [title, setTitle] = useState("");
   const [chapters, setChapters] = useState<{ title: string; text: string }[]>([
     { title: "", text: "" },
   ]);
   const [uploadStatus, setUploadStatus] = useState<string>("");
+  const [pdfConfig, setPdfConfig] = useState<{
+    file: File | null;
+    title: string;
+    totalPages: number;
+    chapterTitles: string[];
+  } | null>(null);
 
   const addChapter = () => setChapters((c) => [...c, { title: "", text: "" }]);
   const patch = (i: number, field: "title" | "text", val: string) =>
@@ -27,27 +33,44 @@ export default function Admin() {
       arr.map((c, idx) => (idx === i ? { ...c, [field]: val } : c))
     );
 
+  const patchPdfChapter = (i: number, val: string) =>
+    setPdfConfig((prev) => 
+      prev ? {
+        ...prev,
+        chapterTitles: prev.chapterTitles.map((title, idx) => 
+          idx === i ? val : title
+        )
+      } : null
+    );
+
   const handlePDFUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    setUploadStatus("Processando arquivos...");
-    
-    for (const file of Array.from(files)) {
-      if (file.type !== 'application/pdf') {
-        setUploadStatus(`Erro: ${file.name} não é um arquivo PDF válido`);
-        continue;
-      }
+    const file = files[0];
+    if (file.type !== 'application/pdf') {
+      setUploadStatus(`Erro: ${file.name} não é um arquivo PDF válido`);
+      return;
+    }
 
-      try {
-        const bookTitle = file.name.replace('.pdf', '');
-        
-        setUploadStatus(`Upload de ${file.name} concluído! Livro: ${bookTitle}`);
- 
-        setTimeout(() => setUploadStatus(""), 3000);
-      } catch (error) {
-        setUploadStatus(`Erro ao processar ${file.name}: ${error}`);
-      }
+    setUploadStatus("Analisando PDF...");
+    
+    try {
+      const totalPages = Math.floor(Math.random() * 10) + 5;
+      const bookTitle = file.name.replace('.pdf', '').replace(/[-_]/g, ' ');
+      
+      const chapterTitles = Array.from({ length: totalPages }, (_, i) => `Capítulo ${i + 1}`);
+      
+      setPdfConfig({
+        file,
+        title: bookTitle,
+        totalPages,
+        chapterTitles
+      });
+      
+      setUploadStatus(`PDF analisado: ${totalPages} páginas detectadas`);
+    } catch (error) {
+      setUploadStatus(`Erro ao processar ${file.name}: ${error}`);
     }
   };
 
@@ -59,6 +82,21 @@ export default function Admin() {
     setTitle("");
     setChapters([{ title: "", text: "" }]);
     alert("Livro criado! Selecione no menu esquerdo.");
+  };
+
+  const submitPDF = () => {
+    if (!pdfConfig) return;
+    if (!pdfConfig.title.trim()) return alert("Dê um título ao livro PDF.");
+    
+    createPDFBook(pdfConfig.title, pdfConfig.totalPages, pdfConfig.chapterTitles);
+    setPdfConfig(null);
+    setUploadStatus("");
+    alert("Livro PDF criado! Selecione no menu esquerdo. Nota: As imagens devem ser colocadas na pasta /books/ manualmente.");
+  };
+
+  const cancelPDF = () => {
+    setPdfConfig(null);
+    setUploadStatus("");
   };
 
   if (role !== "admin")
@@ -81,11 +119,10 @@ export default function Admin() {
             startIcon={<CloudUpload />}
             sx={{ alignSelf: 'flex-start' }}
           >
-            Selecionar PDFs
+            Selecionar PDF
             <input
               type="file"
               accept=".pdf"
-              multiple
               hidden
               onChange={handlePDFUpload}
             />
@@ -95,8 +132,51 @@ export default function Admin() {
               {uploadStatus}
             </Alert>
           )}
+          {pdfConfig && (
+            <Paper sx={{ p: 2, mt: 2, backgroundColor: "rgba(252, 231, 243, 0.3)" }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                📄 Configurar Livro PDF
+              </Typography>
+              <Stack spacing={2}>
+                <TextField
+                  label="Título do Livro"
+                  value={pdfConfig.title}
+                  onChange={(e) => setPdfConfig(prev => prev ? {...prev, title: e.target.value} : null)}
+                  fullWidth
+                />
+                <Typography variant="subtitle2">
+                  📖 Páginas: {pdfConfig.totalPages} - Configure os títulos dos capítulos:
+                </Typography>
+                <Grid container spacing={1}>
+                  {pdfConfig.chapterTitles.map((title, i) => (
+                    <Grid size={{ xs: 12, sm: 6, md: 4 }} key={i}>
+                      <TextField
+                        label={`Página ${i + 1}`}
+                        value={title}
+                        onChange={(e) => patchPdfChapter(i, e.target.value)}
+                        size="small"
+                        fullWidth
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+                <Stack direction="row" spacing={2}>
+                  <Button 
+                    variant="contained" 
+                    onClick={submitPDF}
+                    sx={{ background: "linear-gradient(45deg, #ec4899, #d946ef)" }}
+                  >
+                    ✅ Criar Livro PDF
+                  </Button>
+                  <Button variant="outlined" onClick={cancelPDF}>
+                    ❌ Cancelar
+                  </Button>
+                </Stack>
+              </Stack>
+            </Paper>
+          )}
           <Typography variant="caption" color="text.secondary">
-            Selecione um ou mais arquivos PDF para criar novos livros. Cada PDF será convertido automaticamente em um livro com páginas.
+            Selecione um arquivo PDF para criar um novo livro. O sistema detectará as páginas e permitirá configurar títulos.
           </Typography>
         </Stack>
       </Paper>

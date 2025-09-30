@@ -19,6 +19,7 @@ import Library from "./routes/Library.tsx";
 import Studio from "./routes/Studio.tsx";
 import ExportPDF from "./routes/ExportPDF.tsx";
 import Admin from "./routes/Admin.tsx";
+import TaskNotebook from "./routes/TaskNotebook.tsx";
 import { useBooks } from "./store/booksContext.tsx";
 
 export default function App() {
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="/library" element={<Library />} />
             <Route path="/studio" element={<Studio />} />
             <Route path="/export" element={<ExportPDF />} />
+            <Route path="/task-notebook" element={<TaskNotebook />} />
             <Route path="/admin" element={<Admin />} />
           </Routes>
         </Box>

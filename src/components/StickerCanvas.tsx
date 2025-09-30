@@ -163,7 +163,6 @@ export default React.forwardRef<
         </Typography>
       )}
 
-      {/* Stickers sobrepondo o conteúdo */}
       {items.map((it) => (
         <div
           key={it.id}

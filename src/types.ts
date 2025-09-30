@@ -15,7 +15,6 @@ export interface Collage {
 export interface PDFChapter { 
   id: string; 
   title: string; 
-  unlocked: boolean; 
   pageNumber: number;
   imageUrl?: string;
   collage?: Collage 
@@ -28,12 +27,12 @@ export interface PDFBook {
   totalPages: number;
   chapters: PDFChapter[];
   type: 'pdf';
+  pdfFile?: File;
 }
 
 export interface TextChapter { 
   id: string; 
   title: string; 
-  unlocked: boolean; 
   text: string; 
   collage?: Collage 
 }

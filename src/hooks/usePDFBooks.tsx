@@ -13,7 +13,6 @@ export function usePDFBooks() {
       chapters.push({
         id: `${bookId}-chapter-${i}`,
         title: `Capítulo ${i}`,
-        unlocked: i === 1,
         pageNumber: i,
       });
     }

@@ -14,9 +14,9 @@ export default function Studio() {
 
   useEffect(() => {
     if (activeBook && !chapterId) {
-      const firstUnlockedChapter = activeBook.chapters.find((c) => c.unlocked);
-      if (firstUnlockedChapter) {
-        setChapterId(firstUnlockedChapter.id);
+      const firstChapter = activeBook.chapters[0];
+      if (firstChapter) {
+        setChapterId(firstChapter.id);
       }
     }
   }, [activeBook, chapterId]);
@@ -136,7 +136,6 @@ export default function Studio() {
       <Grid size={{ xs: 12, md: 4 }}>
         <Stack spacing={2}>
           {activeBook.chapters
-            .filter((c) => c.unlocked)
             .map((c) => (
               <div
                 key={c.id}
