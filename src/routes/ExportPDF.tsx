@@ -370,8 +370,9 @@ export default function ExportPDF() {
                     key={`${it.id}-${refreshKey}`}
                     style={{
                       position: "absolute",
-                      left: `calc(${it.x * 100}% - 10px)`,
-                      top: `calc(${it.y * 100}% - 10px)`,
+                      left: `${it.x * 100}%`,
+                      top: `${it.y * 100}%`,
+                      transform: "translate(-50%,-50%)",
                       fontSize: 20,
                       zIndex: 10,
                     }}
@@ -461,35 +462,32 @@ function renderPrintablePDFHTML(
       const emojiContent = it.emoji.startsWith("data:image/svg+xml")
         ? `<img src="${it.emoji}" alt="Custom sticker" style="width:28px;height:28px;"/>`
         : it.emoji;
-      return `<div style="position:absolute;left:calc(${
+      return `<div style="position:absolute;left:${
         it.x * 100
-      }% - 14px);top:calc(${
+      }%;top:${
         it.y * 100
-      }% - 14px);font-size:28px;z-index:10;">${emojiContent}</div>`;
+      }%;transform:translate(-50%,-50%);font-size:28px;z-index:10;">${emojiContent}</div>`;
     })
     .join("");
-
-  const containerStyle = pageWidth && pageHeight ? 
-    `width:${pageWidth}px;height:${pageHeight}px;` : 
-    'width:100%;height:100vh;';
 
   return `<!doctype html><html><head><meta charset="utf-8"/><title>${bookTitle} – ${chapterTitle}</title>
 <style>
 @page {
   margin: 0;
-  size: ${pageWidth && pageHeight ? `${pageWidth}px ${pageHeight}px` : 'A4'};
+  size: A4;
 }
 body{
   margin:0;
   padding:0;
-  width:100%;
-  height:100%;
+  width:210mm;
+  height:297mm;
   overflow:hidden;
   background:#fff;
 } 
 .page-container{
   position:relative;
-  ${containerStyle}
+  width:210mm;
+  height:297mm;
   margin:0 auto;
   background:#fff;
 } 
@@ -538,11 +536,11 @@ function renderMultipleChaptersHTML(
             const emojiContent = it.emoji.startsWith("data:image/svg+xml")
               ? `<img src="${it.emoji}" alt="Custom sticker" style="width:28px;height:28px;"/>`
               : it.emoji;
-            return `<div style="position:absolute;left:calc(${
+            return `<div style="position:absolute;left:${
               it.x * 100
-            }% - 14px);top:calc(${
+            }%;top:${
               it.y * 100
-            }% - 14px);font-size:28px;z-index:10;">${emojiContent}</div>`;
+            }%;transform:translate(-50%,-50%);font-size:28px;z-index:10;">${emojiContent}</div>`;
           })
           .join("");
 
