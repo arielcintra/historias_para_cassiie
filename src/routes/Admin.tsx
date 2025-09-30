@@ -88,10 +88,10 @@ export default function Admin() {
     if (!pdfConfig) return;
     if (!pdfConfig.title.trim()) return alert("Dê um título ao livro PDF.");
     
-    createPDFBook(pdfConfig.title, pdfConfig.totalPages, pdfConfig.chapterTitles);
+    createPDFBook(pdfConfig.title, pdfConfig.totalPages, pdfConfig.chapterTitles, pdfConfig.file);
     setPdfConfig(null);
     setUploadStatus("");
-    alert("Livro PDF criado! Selecione no menu esquerdo. Nota: As imagens devem ser colocadas na pasta /books/ manualmente.");
+    alert("Livro PDF criado! Selecione no menu esquerdo. Agora você pode editar as páginas diretamente no Studio de Colagem!");
   };
 
   const cancelPDF = () => {

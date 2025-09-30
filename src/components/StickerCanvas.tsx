@@ -2,6 +2,7 @@ import React, { useImperativeHandle, useRef, useState, useEffect } from "react";
 import { Alert, AlertTitle, Button, Paper, Typography, Box } from "@mui/material";
 import type { Collage, StickerItem, Chapter } from "../types";
 import PDFViewer from "./PDFViewer.tsx";
+import { useBooks } from "../store/booksContext.tsx";
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
@@ -14,6 +15,7 @@ export default React.forwardRef<
   StickerCanvasHandle,
   { text: string; initial?: Collage; chapter?: Chapter }
 >(function StickerCanvas({ text, initial, chapter }, ref) {
+  const { activeBook } = useBooks();
   const [items, setItems] = useState<StickerItem[]>(initial?.items ?? []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -154,7 +156,8 @@ export default React.forwardRef<
         <Box sx={{ position: 'relative', mt: 2 }}>
           <PDFViewer 
             bookId={bookId} 
-            pageNumber={chapter.pageNumber} 
+            pageNumber={chapter.pageNumber}
+            pdfFile={activeBook?.type === 'pdf' ? activeBook.pdfFile : undefined}
           />
         </Box>
       ) : (
