@@ -442,8 +442,8 @@ function renderPrintableHTML(
       (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]!)
     );
   return `<!doctype html><html><head><meta charset="utf-8"/><title>${bookTitle} – ${chapterTitle}</title>
-<style>body{margin:0;background:#201b4a;color:#fff;font-family:system-ui} .page{min-height:100vh;padding:48px} .story{position:relative;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:24px;min-height:70vh} h1{margin:0 0 12px}</style>
-</head><body><section class="page"><h1>${chapterTitle}</h1><div class="story"><p>${escape(
+<style>body{margin:0;background:#fff;color:#000;font-family:system-ui} .page{min-height:100vh;padding:0} .story{position:relative;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:24px;min-height:100vh} </style>
+</head><body><section class="page"><div class="story"><p>${escape(
     text
   )}</p>${items}</div></section></body></html>`;
 }
@@ -546,7 +546,7 @@ function renderMultipleChaptersHTML(
           })
           .join("");
 
-        return `<section class="page"><h1>${chapter.title}</h1><div class="story"><img src="${imagePath}" alt="Página do livro" class="pdf-image"/>${items}</div></section>`;
+        return `<section class="page"><div class="story"><img src="${imagePath}" alt="Página do livro" class="pdf-image"/>${items}</div></section>`;
       } else {
         const items = (collageToUse?.items ?? [])
           .map(
@@ -566,9 +566,7 @@ function renderMultipleChaptersHTML(
           );
 
         const text = "text" in chapter ? chapter.text : "";
-        return `<section class="page"><h1>${
-          chapter.title
-        }</h1><div class="story"><p>${escape(
+        return `<section class="page"><div class="story"><p>${escape(
           text
         )}</p>${items}</div></section>`;
       }
@@ -577,11 +575,10 @@ function renderMultipleChaptersHTML(
 
   return `<!doctype html><html><head><meta charset="utf-8"/><title>${bookTitle} - Compilado</title>
 <style>
-body{margin:0;background:#201b4a;color:#fff;font-family:system-ui} 
-.page{min-height:100vh;padding:48px;page-break-after:always} 
-.story{position:relative;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:24px;min-height:70vh;display:flex;justify-content:center;align-items:center;} 
-h1{margin:0 0 12px}
-.pdf-image{max-width:100%;max-height:60vh;border-radius:8px;}
+body{margin:0;background:#fff;color:#000;font-family:system-ui} 
+.page{min-height:100vh;padding:0;page-break-after:always} 
+.story{position:relative;background:#fff;border:none;border-radius:0;padding:0;min-height:100vh;display:flex;justify-content:center;align-items:center;} 
+.pdf-image{width:100%;height:100%;object-fit:contain;border-radius:0;}
 @media print { .page { page-break-after: always; } }
 </style>
 </head><body>${pagesHTML}</body></html>`;
