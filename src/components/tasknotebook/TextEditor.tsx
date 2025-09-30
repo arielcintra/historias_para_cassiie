@@ -23,22 +23,7 @@ import {
   FormatAlignRight,
 } from '@mui/icons-material';
 import { TextItem } from '../../hooks/useTaskNotebook';
-
-const FONT_FAMILIES = [
-  'Arial',
-  'Helvetica',
-  'Times New Roman',
-  'Courier New',
-  'Comic Sans MS',
-  'Impact',
-  'Georgia',
-  'Verdana'
-];
-
-const COLORS = [
-  '#000000', '#581c87', '#7c3aed', '#ec4899', '#d946ef',
-  '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'
-];
+import { FONT_FAMILIES, COLORS } from '../../constants/theme.ts';
 
 interface TextEditorProps {
   selectedTextItem: TextItem;
@@ -92,7 +77,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
               value={selectedTextItem.color}
               onChange={(e) => onUpdateTextItem(selectedTextId, { color: e.target.value })}
             >
-              {COLORS.map(color => (
+              {COLORS.palette.map(color => (
                 <MenuItem key={color} value={color}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Box sx={{ width: 16, height: 16, backgroundColor: color, borderRadius: 1 }} />

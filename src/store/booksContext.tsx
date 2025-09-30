@@ -8,8 +8,8 @@ import React, {
 import { v4 as uuid } from "uuid";
 import type { Book, Collage, Role, TextBook, TextChapter, PDFBook, PDFChapter } from "../types";
 import { usePDFBooks } from "../hooks/usePDFBooks.tsx";
-
-const LS_KEY = "celestial-books-mui-ts-v1";
+import { LocalStorage, STORAGE_KEYS } from "../utils/localStorage.ts";
+import { usePDFCollages } from "../hooks/usePDFCollages.ts";
 
 const textSeed: TextBook[] = [
   {
@@ -46,7 +46,8 @@ interface BooksContextShape {
   createPDFBook: (
     title: string,
     totalPages: number,
-    chapterTitles?: string[]
+    chapterTitles?: string[],
+    pdfFile?: File
   ) => void;
 }
 
@@ -59,27 +60,31 @@ export const useBooks = () => {
 
 export function BooksProvider({ children }: { children: React.ReactNode }) {
   const { pdfBooks } = usePDFBooks();
+  const { savePDFCollage } = usePDFCollages();
+  
+  // Separate state for PDF files (not serialized to localStorage)
+  const [pdfFiles, setPdfFiles] = useState<Record<string, File>>({});
+  
   const [textBooks, setTextBooks] = useState<TextBook[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(LS_KEY) || "null")?.textBooks ?? textSeed;
-    } catch {
-      return textSeed;
-    }
+    return LocalStorage.get(STORAGE_KEYS.BOOKS, {})?.textBooks ?? textSeed;
   });
+  
   const [dynamicPdfBooks, setDynamicPdfBooks] = useState<PDFBook[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(LS_KEY) || "null")?.dynamicPdfBooks ?? [];
-    } catch {
-      return [];
-    }
+    return LocalStorage.get(STORAGE_KEYS.BOOKS, {})?.dynamicPdfBooks ?? [];
   });
   const [role, setRole] = useState<Role>("reader");
 
   const books = useMemo<Book[]>(() => {
-    const sortedPdfBooks = [...pdfBooks, ...dynamicPdfBooks].sort((a, b) => a.id.localeCompare(b.id));
+    // Add PDF files to dynamic PDF books
+    const enrichedDynamicPdfBooks = dynamicPdfBooks.map(book => ({
+      ...book,
+      pdfFile: pdfFiles[book.id]
+    }));
+    
+    const sortedPdfBooks = [...pdfBooks, ...enrichedDynamicPdfBooks].sort((a, b) => a.id.localeCompare(b.id));
     const sortedTextBooks = [...textBooks].sort((a, b) => a.id.localeCompare(b.id));
     return [...sortedPdfBooks, ...sortedTextBooks];
-  }, [pdfBooks, dynamicPdfBooks, textBooks]);
+  }, [pdfBooks, dynamicPdfBooks, textBooks, pdfFiles]);
 
   const [activeBookId, setActiveBookId] = useState<string | undefined>();
 
@@ -93,7 +98,12 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
   }, [books, activeBookId]);
 
   useEffect(() => {
-    localStorage.setItem(LS_KEY, JSON.stringify({ textBooks, dynamicPdfBooks }));
+    // Remove pdfFile from books before saving to localStorage
+    const cleanDynamicPdfBooks = dynamicPdfBooks.map(book => {
+      const { pdfFile, ...cleanBook } = book;
+      return cleanBook;
+    });
+    LocalStorage.set(STORAGE_KEYS.BOOKS, { textBooks, dynamicPdfBooks: cleanDynamicPdfBooks });
   }, [textBooks, dynamicPdfBooks]);
 
   const activeBook = useMemo(
@@ -118,14 +128,8 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
               }
         )
       );
-    } else if (activeBook.type === 'pdf') {
-      const pdfCollages = JSON.parse(localStorage.getItem('pdf-collages') || '{}');
-      pdfCollages[`${activeBookId}-${chapterId}`] = collage;
-      localStorage.setItem('pdf-collages', JSON.stringify(pdfCollages));
-      
-      window.dispatchEvent(new CustomEvent('pdfCollageUpdate', {
-        detail: { bookId: activeBookId, chapterId }
-      }));
+    } else if (activeBook.type === 'pdf' && collage) {
+      savePDFCollage(activeBookId, chapterId, collage);
     }
   };
 
@@ -174,8 +178,12 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
       totalPages,
       chapters,
       type: 'pdf',
-      pdfFile,
     };
+    
+    // Store PDF file separately
+    if (pdfFile) {
+      setPdfFiles(prev => ({ ...prev, [bookId]: pdfFile }));
+    }
     
     setDynamicPdfBooks((prev) => [...prev, nb]);
     setActiveBookId(nb.id);

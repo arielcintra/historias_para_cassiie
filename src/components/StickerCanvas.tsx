@@ -140,6 +140,12 @@ export default React.forwardRef<
   const isPDFChapter = chapter && 'pageNumber' in chapter;
   const bookId = chapter?.id.split('-chapter-')[0];
 
+  console.log('StickerCanvas: chapter:', chapter);
+  console.log('StickerCanvas: activeBook:', activeBook);
+  console.log('StickerCanvas: isPDFChapter:', isPDFChapter);
+  console.log('StickerCanvas: bookId:', bookId);
+  console.log('StickerCanvas: pdfFile exists:', !!(activeBook?.type === 'pdf' && activeBook.pdfFile));
+
   return (
     <Paper
       ref={boxRef}

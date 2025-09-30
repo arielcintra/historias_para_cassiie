@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { LocalStorage, STORAGE_KEYS } from '../utils/localStorage.ts';
 
 export interface StarItem {
   id: string;
@@ -34,13 +35,14 @@ export const useTaskNotebook = () => {
   const [score, setScore] = useState(0);
 
   useEffect(() => {
-    const saved = localStorage.getItem('task-notebook-data');
-    if (saved) {
-      const data = JSON.parse(saved);
-      setStars(data.stars || []);
-      setTextItems(data.textItems || []);
-      setScore(data.score || 0);
-    }
+    const data = LocalStorage.get(STORAGE_KEYS.TASK_NOTEBOOK_DATA, {
+      stars: [],
+      textItems: [],
+      score: 0
+    });
+    setStars(data.stars || []);
+    setTextItems(data.textItems || []);
+    setScore(data.score || 0);
   }, []);
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export const useTaskNotebook = () => {
       textItems,
       score
     };
-    localStorage.setItem('task-notebook-data', JSON.stringify(dataToSave));
+    LocalStorage.set(STORAGE_KEYS.TASK_NOTEBOOK_DATA, dataToSave);
   }, [stars, textItems, score]);
 
   const calculateScore = (starList: StarItem[]) => {
@@ -90,16 +92,16 @@ export const useTaskNotebook = () => {
   };
 
   const saveCustomImage = async (imageData: string, fileName: string): Promise<string> => {
-    const currentVersion = parseInt(localStorage.getItem('task-notebook-version') || '0');
+    const currentVersion = LocalStorage.get(STORAGE_KEYS.TASK_NOTEBOOK_VERSION, 0);
     const nextVersion = currentVersion + 1;
     
     const extension = fileName.split('.').pop();
     const versionedFileName = `v${nextVersion}.${extension}`;
     
-    const customImages = JSON.parse(localStorage.getItem('task-notebook-custom-images') || '{}');
+    const customImages = LocalStorage.get(STORAGE_KEYS.TASK_NOTEBOOK_CUSTOM_IMAGES, {} as Record<string, string>);
     customImages[versionedFileName] = imageData;
-    localStorage.setItem('task-notebook-custom-images', JSON.stringify(customImages));
-    localStorage.setItem('task-notebook-version', nextVersion.toString());
+    LocalStorage.set(STORAGE_KEYS.TASK_NOTEBOOK_CUSTOM_IMAGES, customImages);
+    LocalStorage.set(STORAGE_KEYS.TASK_NOTEBOOK_VERSION, nextVersion);
     
     return `data-image:${versionedFileName}`;
   };
@@ -155,7 +157,7 @@ export const useTaskNotebook = () => {
   const getCustomImageSrc = (imagePath: string): string => {
     if (imagePath.startsWith('data-image:')) {
       const fileName = imagePath.replace('data-image:', '');
-      const customImages = JSON.parse(localStorage.getItem('task-notebook-custom-images') || '{}');
+      const customImages = LocalStorage.get(STORAGE_KEYS.TASK_NOTEBOOK_CUSTOM_IMAGES, {} as Record<string, string>);
       return customImages[fileName] || imagePath;
     }
     return imagePath;

@@ -35,7 +35,6 @@ export const ToolsPanel: React.FC<ToolsPanelProps> = ({
               label={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <img src={`${process.env.PUBLIC_URL}/images/estrela_roxa.png`} alt="Estrela Roxa" style={{ width: 16, height: 16 }} />
-                  <span>1pt</span>
                 </Box>
               } 
               onClick={() => onAddStar('purple')}
@@ -45,7 +44,6 @@ export const ToolsPanel: React.FC<ToolsPanelProps> = ({
               label={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <img src={`${process.env.PUBLIC_URL}/images/estrela_laranja.png`} alt="Estrela Laranja" style={{ width: 16, height: 16 }} />
-                  <span>2pt</span>
                 </Box>
               } 
               onClick={() => onAddStar('orange')}
@@ -55,7 +53,6 @@ export const ToolsPanel: React.FC<ToolsPanelProps> = ({
               label={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <img src={`${process.env.PUBLIC_URL}/images/estrela_dourada.png`} alt="Estrela Dourada" style={{ width: 16, height: 16 }} />
-                  <span>3pt</span>
                 </Box>
               } 
               onClick={() => onAddStar('gold')}

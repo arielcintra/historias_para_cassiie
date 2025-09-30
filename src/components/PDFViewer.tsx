@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Box, CircularProgress, Alert, Typography } from '@mui/material';
+import { loadPDFDocument, renderPDFPageToCanvas } from '../utils/pdfUtils.ts';
 
 interface PDFViewerProps {
   bookId: string;
@@ -17,12 +18,15 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
   useEffect(() => {
     const loadPDFPage = async () => {
       try {
+        console.log('PDFViewer: Carregando página', pageNumber, 'bookId:', bookId, 'pdfFile:', !!pdfFile);
         setLoading(true);
         setError('');
 
         if (pdfFile) {
+          console.log('PDFViewer: Renderizando PDF direto');
           await renderPDFPage(pdfFile, pageNumber);
         } else {
+          console.log('PDFViewer: Tentando carregar imagens estáticas');
           await loadStaticImages();
         }
 
@@ -35,12 +39,30 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
 
     const renderPDFPage = async (file: File, page: number) => {
       try {
-        const pdfjsLib = await import('pdfjs-dist');
+        console.log('PDFViewer: renderPDFPage - file type:', typeof file, 'instanceof File:', file instanceof File);
+        console.log('PDFViewer: file instanceof Blob:', file instanceof Blob);
+        console.log('PDFViewer: file properties:', Object.keys(file));
+        console.log('PDFViewer: file value:', file);
         
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        // Check if we have a valid File/Blob object
+        if (!file || (typeof file !== 'object') || !(file instanceof Blob)) {
+          throw new Error(`Invalid file object. Expected File/Blob, got: ${typeof file}`);
+        }
+        
+        let arrayBuffer: ArrayBuffer;
+        
+        if (file.arrayBuffer && typeof file.arrayBuffer === 'function') {
+          arrayBuffer = await file.arrayBuffer();
+        } else {
+          arrayBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as ArrayBuffer);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+          });
+        }
+        
+        const pdf = await loadPDFDocument(arrayBuffer);
         
         if (page > pdf.numPages) {
           setError(`Página ${page} não existe. PDF tem ${pdf.numPages} páginas.`);
@@ -57,29 +79,7 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
           return;
         }
 
-        const context = canvas.getContext('2d');
-        if (!context) {
-          setError('Contexto 2D não disponível');
-          setLoading(false);
-          return;
-        }
-
-        const containerWidth = 800;
-        const viewport = pdfPage.getViewport({ scale: 1 });
-        const scale = containerWidth / viewport.width;
-        const scaledViewport = pdfPage.getViewport({ scale });
-
-        canvas.width = scaledViewport.width;
-        canvas.height = scaledViewport.height;
-
-        const renderContext = {
-          canvasContext: context,
-          viewport: scaledViewport
-        };
-
-        await pdfPage.render(renderContext).promise;
-        
-        const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = await renderPDFPageToCanvas(pdfPage, canvas);
         setImageUrl(dataUrl);
         
         if (onPageLoad) {

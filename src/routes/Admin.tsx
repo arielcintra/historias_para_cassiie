@@ -12,6 +12,8 @@ import {
 } from "@mui/material";
 import { CloudUpload } from "@mui/icons-material";
 import { useBooks } from "../store/booksContext.tsx";
+import { loadPDFDocument } from "../utils/pdfUtils.ts";
+import { GRADIENTS } from "../constants/theme.ts";
 
 export default function Admin() {
   const { createBook, createPDFBook, role } = useBooks();
@@ -56,15 +58,25 @@ export default function Admin() {
     setUploadStatus("Analisando PDF...");
     
     try {
-      const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-
+      console.log('Iniciando análise do PDF:', file.name);
+      
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      console.log('Array buffer criado, tamanho:', arrayBuffer.byteLength);
+      
+      const pdf = await loadPDFDocument(arrayBuffer);
+      console.log('PDF carregado, objeto:', pdf);
+      
       const totalPages = pdf.numPages;
+      console.log('Número de páginas detectadas:', totalPages);
       
       const bookTitle = file.name.replace('.pdf', '').replace(/[-_]/g, ' ');
       const chapterTitles = Array.from({ length: totalPages }, (_, i) => `Página ${i + 1}`);
+      
+      console.log('Configuração do PDF:', {
+        title: bookTitle,
+        totalPages,
+        chapterTitles
+      });
       
       setPdfConfig({
         file,
@@ -170,7 +182,7 @@ export default function Admin() {
                   <Button 
                     variant="contained" 
                     onClick={submitPDF}
-                    sx={{ background: "linear-gradient(45deg, #ec4899, #d946ef)" }}
+                    sx={{ background: GRADIENTS.primary }}
                   >
                     ✅ Criar Livro PDF
                   </Button>
