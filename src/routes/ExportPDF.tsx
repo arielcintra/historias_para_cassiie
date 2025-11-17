@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Grid, Button, Paper, Stack, Typography, Box, Chip } from "@mui/material";
 import { useBooks } from "../store/booksContext.tsx";
-import type { Collage, Chapter } from "../types";
+import type { Chapter } from "../types";
 import { loadPDFDocument, renderPDFPageToCanvas } from "../utils/pdfUtils.ts";
 import { getPageStorage } from "../storage/index.ts";
 
@@ -246,113 +246,6 @@ export default function ExportPDF() {
       </Grid>
     </Grid>
   );
-}
-
-function renderPrintableHTML(
-  bookTitle: string,
-  chapterTitle: string,
-  text: string,
-  collage?: Collage
-) {
-  const items = (collage?.items ?? [])
-    .map(
-      (it) =>
-        `<div style="position:absolute;left:${it.x * 100}%;top:${
-          it.y * 100
-        }%;transform:translate(-50%,-50%);font-size:28px;">${it.emoji}</div>`
-    )
-    .join("");
-  const escape = (s: string) =>
-    s.replace(
-      /[&<>]/g,
-      (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]!)
-    );
-  return `<!doctype html><html><head><meta charset="utf-8"/><title>${bookTitle} – ${chapterTitle}</title>
-<style>body{margin:0;background:#fff;color:#000;font-family:system-ui} .page{min-height:100vh;padding:0} .story{position:relative;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:24px;min-height:100vh} </style>
-</head><body><section class="page"><div class="story"><p>${escape(
-    text
-  )}</p>${items}</div></section></body></html>`;
-}
-
-function renderPrintablePDFHTML(
-  bookTitle: string,
-  chapterTitle: string,
-  imagePath: string,
-  collage?: Collage,
-  pageWidth?: number,
-  pageHeight?: number
-) {
-  const items = (collage?.items ?? [])
-    .map((it) => {
-      const emojiContent = it.emoji.startsWith("data:image/svg+xml")
-        ? `<img src="${it.emoji}" alt="Custom sticker" style="width:28px;height:28px;"/>`
-        : it.emoji;
-      return `<div style="position:absolute;left:${
-        it.x * 100
-      }%;top:${
-        it.y * 100
-      }%;transform:translate(-50%,-50%);font-size:28px;z-index:10;">${emojiContent}</div>`;
-    })
-    .join("");
-
-  return `<!doctype html><html><head><meta charset="utf-8"/><title>${bookTitle} – ${chapterTitle}</title>
-<style>
-@page {
-  margin: 0;
-  size: A4;
-}
-body{
-  margin:0;
-  padding:0;
-  width:210mm;
-  height:297mm;
-  overflow:hidden;
-  background:#fff;
-} 
-.page-container{
-  position:relative;
-  width:210mm;
-  height:297mm;
-  margin:0 auto;
-  background:#fff;
-} 
-.pdf-image{
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  display:block;
-}
-.stickers-overlay{
-  position:absolute;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  pointer-events:none;
-}
-</style>
-</head><body>
-<div class="page-container">
-  <img src="${imagePath}" alt="Página do livro" class="pdf-image"/>
-  <div class="stickers-overlay">${items}</div>
-</div>
-<script>
-  (function(){
-    function printWhenReady(){
-      var imgs = Array.from(document.images||[]);
-      if(imgs.length===0){ window.print(); return; }
-      var remaining = imgs.length;
-      var done = function(){ if(--remaining===0){ window.print(); } };
-      imgs.forEach(function(img){
-        if (img.complete) { done(); }
-        else { img.addEventListener('load', done); img.addEventListener('error', done); }
-      });
-      setTimeout(function(){ if(remaining>0) window.print(); }, 2000);
-    }
-    window.addEventListener('load', printWhenReady);
-  })();
-</script>
-</body></html>`;
 }
 
 function renderMultipleChaptersHTML(
