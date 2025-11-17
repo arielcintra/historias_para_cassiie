@@ -14,8 +14,6 @@ import { CloudUpload } from "@mui/icons-material";
 import { useBooks } from "../store/booksContext.tsx";
 import { loadPDFDocument } from "../utils/pdfUtils.ts";
 import { GRADIENTS } from "../constants/theme.ts";
-import { enableDrive } from "../storage/index.ts";
-import { initGoogleAuth, isSignedIn, ensureToken, signOut } from "../services/googleAuth.ts";
 
 export default function Admin() {
   const { createBook, createPDFBook, role, activeBook, deleteBook } = useBooks();
@@ -24,7 +22,6 @@ export default function Admin() {
     { title: "", text: "" },
   ]);
   const [uploadStatus, setUploadStatus] = useState<string>("");
-  const [driveReady, setDriveReady] = useState<boolean>(false);
   const [pdfConfig, setPdfConfig] = useState<{
     file: File | undefined;
     title: string;
@@ -144,33 +141,8 @@ export default function Admin() {
           </Button>
         </Box>
       )}
-      
+
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-          <Button
-            variant="outlined"
-            onClick={async () => {
-              try {
-                const clientId = (process.env.REACT_APP_GOOGLE_CLIENT_ID as string) || (window as any).__GOOGLE_CLIENT_ID__;
-                if (!clientId) {
-                  alert('Configure REACT_APP_GOOGLE_CLIENT_ID para usar Google Drive.');
-                  return;
-                }
-                await enableDrive(clientId);
-                await initGoogleAuth(clientId);
-                await ensureToken(clientId);
-                setDriveReady(true);
-              } catch (e:any) {
-                alert('Falha ao inicializar Google Drive: ' + e?.message);
-              }
-            }}
-          >
-            {driveReady || isSignedIn() ? 'Google Drive Conectado' : 'Conectar Google Drive'}
-          </Button>
-          {(driveReady || isSignedIn()) && (
-            <Button variant="text" onClick={() => { signOut(); setDriveReady(false); }}>Sair</Button>
-          )}
-        </Stack>
         <Typography variant="subtitle1" sx={{ mb: 2 }}>
           Upload de Livros PDF
         </Typography>

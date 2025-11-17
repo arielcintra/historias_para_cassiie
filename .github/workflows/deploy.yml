@@ -26,8 +26,6 @@ jobs:
         cache: 'npm'
 
     - name: Install and Build 🔧
-      env:
-        REACT_APP_GOOGLE_CLIENT_ID: ${{ secrets.REACT_APP_GOOGLE_CLIENT_ID }} 
       run: |
         npm ci
         npm run build

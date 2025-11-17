@@ -10,8 +10,6 @@ import type { Book, Collage, Role, TextBook, TextChapter, PDFBook, PDFChapter } 
 import { usePDFBooks } from "../hooks/usePDFBooks.tsx";
 import { LocalStorage, STORAGE_KEYS } from "../utils/localStorage.ts";
 import { usePDFCollages } from "../hooks/usePDFCollages.ts";
-import { isSignedIn } from "../services/googleAuth.ts";
-import { getDriveContext, ensureBookFolder, uploadOrUpdateBinary } from "../services/googleDrive.ts";
 import { getPageStorage } from "../storage/index.ts";
 
 const textSeed: TextBook[] = [
@@ -194,19 +192,6 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
 
     setDynamicPdfBooks((prev) => [...prev, nb]);
     setActiveBookId(nb.id);
-
-    // If Drive is connected, upload source PDF to CassUniverse/book-{id}/source.pdf
-    if (pdfFile && isSignedIn()) {
-      (async () => {
-        try {
-          const ctx = getDriveContext();
-          const folderId = await ensureBookFolder(ctx, bookId);
-          await uploadOrUpdateBinary(ctx, folderId, 'source.pdf', pdfFile);
-        } catch (e) {
-          console.warn('Falha ao enviar PDF ao Drive:', e);
-        }
-      })();
-    }
   };
 
   const value: BooksContextShape = {

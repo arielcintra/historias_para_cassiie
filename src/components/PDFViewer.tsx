@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Box, CircularProgress, Alert, Typography } from '@mui/material';
 import { loadPDFDocument, renderPDFPageToCanvas } from '../utils/pdfUtils.ts';
 import { getPageStorage } from '../storage/index.ts';
-import { getDriveContext, ensureBookFolder, downloadFileBlob } from '../services/googleDrive.ts';
 
 interface PDFViewerProps {
   bookId: string;
@@ -38,32 +37,8 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
               setLoading(false);
             } else {
               if (isDynamic) {
-                // Try Drive source.pdf for dynamic books when no preview exists
-                try {
-                  const ctx = getDriveContext();
-                  const folderId = await ensureBookFolder(ctx, bookId);
-                  const blob = await downloadFileBlob(ctx, folderId, 'source.pdf');
-                  if (blob) {
-                    const arrayBuffer = await blob.arrayBuffer();
-                    const pdf = await loadPDFDocument(arrayBuffer);
-                    if (pageNumber > pdf.numPages) {
-                      setError(`Página ${pageNumber} não existe. PDF tem ${pdf.numPages} páginas.`);
-                      setLoading(false);
-                      return;
-                    }
-                    const pdfPage = await pdf.getPage(pageNumber);
-                    const canvas = canvasRef.current ?? document.createElement('canvas');
-                    const dataUrl = await renderPDFPageToCanvas(pdfPage, canvas);
-                    setImageUrl(dataUrl);
-                    getPageStorage().setPage(bookId, pageNumber, dataUrl).catch(() => {});
-                    onPageLoad?.(dataUrl);
-                    setLoading(false);
-                  } else {
-                    setLoading(false);
-                  }
-                } catch {
-                  setLoading(false);
-                }
+                // No cached preview for dynamic books
+                setLoading(false);
               } else {
                 console.log('PDFViewer: Tentando carregar imagens estáticas');
                 await loadStaticImages();
