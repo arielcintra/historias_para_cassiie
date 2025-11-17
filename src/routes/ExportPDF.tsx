@@ -1,24 +1,16 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  Grid,
-  Button,
-  Paper,
-  Stack,
-  Typography,
-  Checkbox,
-  FormControlLabel,
-  Box,
-} from "@mui/material";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Grid, Button, Paper, Stack, Typography, Box, Chip } from "@mui/material";
 import { useBooks } from "../store/booksContext.tsx";
-import StoryPreview from "../components/StoryPreview.tsx";
-import PDFViewer from "../components/PDFViewer.tsx";
 import type { Collage, Chapter } from "../types";
+import { loadPDFDocument, renderPDFPageToCanvas } from "../utils/pdfUtils.ts";
+import { getPageStorage } from "../storage/index.ts";
 
 export default function ExportPDF() {
   const { activeBook } = useBooks();
   const [chapterId, setChapterId] = useState<string | undefined>();
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [previewImages, setPreviewImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (activeBook && !chapterId) {
@@ -64,36 +56,116 @@ export default function ExportPDF() {
     };
   }, [refreshPreview, activeBook?.id, chapterId]);
 
+  const pdfDocRef = useRef<any | null>(null);
+  const pageImageCache = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!activeBook) return;
+    (async () => {
+      if (!activeBook) return;
+      const updates: Record<string, string> = {};
+      for (const id of selectedChapters) {
+        const c = activeBook.chapters.find((ch) => ch.id === id);
+        if (!c || !("pageNumber" in c)) continue;
+        if (!previewImages[id]) {
+          try {
+            updates[id] = await getPdfPageDataUrl(c.pageNumber);
+          } catch {
+            // ignore errors
+          }
+        }
+      }
+      if (Object.keys(updates).length) {
+        setPreviewImages((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChapters, activeBook?.id]);
+
   if (!activeBook) return <Typography>Selecione um livro.</Typography>;
 
-  const handleChapterSelection = (chapterId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedChapters((prev) => [...prev, chapterId]);
-    } else {
-      setSelectedChapters((prev) => prev.filter((id) => id !== chapterId));
-    }
+  const addSelect = (chapterId: string) => {
+    setSelectedChapters((prev) => (prev.includes(chapterId) ? prev : [...prev, chapterId]));
+  };
+  const removeSelect = (chapterId: string) => {
+    setSelectedChapters((prev) => prev.filter((id) => id !== chapterId));
   };
 
-  const handlePrintMultiple = () => {
+  const getPdfPageDataUrl = async (pageNumber: number): Promise<string> => {
+    if (!activeBook || activeBook.type !== 'pdf') {
+      throw new Error('PDF not available');
+    }
+    // Cache by chapter key
+    const key = `${activeBook.id}-${pageNumber}`;
+    if (pageImageCache.current[key]) return pageImageCache.current[key];
+
+    // If we don't have the file, try persistent preview cache (Drive or Local)
+    if (!activeBook.pdfFile) {
+      const cached = await getPageStorage().getPage(activeBook.id, pageNumber);
+      if (cached) {
+        pageImageCache.current[key] = cached;
+        return cached;
+      }
+      throw new Error('No PDF file or cached preview available');
+    }
+
+    // Load or reuse the PDF document
+    if (!pdfDocRef.current) {
+      const buffer = await activeBook.pdfFile.arrayBuffer();
+      pdfDocRef.current = await loadPDFDocument(buffer);
+    }
+    const pdfPage = await pdfDocRef.current.getPage(pageNumber);
+    const canvas = document.createElement('canvas');
+    const dataUrl = await renderPDFPageToCanvas(pdfPage, canvas, 800);
+    pageImageCache.current[key] = dataUrl;
+    // Save via configured storage
+    try { await getPageStorage().setPage(activeBook.id, pageNumber, dataUrl); } catch {}
+    return dataUrl;
+  };
+
+  const handlePrintMultiple = async () => {
     if (selectedChapters.length === 0) return;
 
     const chaptersToExport = activeBook.chapters.filter((c) =>
       selectedChapters.includes(c.id)
     );
+    const imageMap: Record<string, string> = {};
+    if (activeBook.type === 'pdf') {
+      // Pre-render or fetch cached for all PDF chapters
+      for (const c of chaptersToExport) {
+        if ('pageNumber' in c) {
+          try {
+            imageMap[c.id] = await getPdfPageDataUrl(c.pageNumber);
+          } catch (e) {
+            // ignore; will fallback to static path logic later
+          }
+        }
+      }
+    }
+
     const w = window.open("", "_blank")!;
-    w.document.write(
-      renderMultipleChaptersHTML(
-        activeBook.title,
-        chaptersToExport,
-        activeBook.id
-      )
-    );
+    // Prefer dynamic renderer when we have images
+    const html = Object.keys(imageMap).length > 0
+      ? renderMultipleChaptersHTMLDynamic(
+          activeBook.title,
+          chaptersToExport,
+          activeBook.id,
+          imageMap
+        )
+      : renderMultipleChaptersHTML(
+          activeBook.title,
+          chaptersToExport,
+          activeBook.id
+        );
+    // Write synchronously to avoid blank page
+    w.document.open();
+    w.document.write(html);
     w.document.close();
     w.focus();
-    w.print();
+    // window.print() will be triggered by the HTML's script after images load
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!chapter) return;
 
     let collageToUse = chapter.collage;
@@ -106,41 +178,39 @@ export default function ExportPDF() {
     }
 
     if ("pageNumber" in chapter) {
-      const imagePath = `${process.env.PUBLIC_URL}/books/${activeBook.id}/page-${chapter.pageNumber}.svg`;
-      
-      let pageWidth, pageHeight;
-      if (activeBook.type === 'pdf' && activeBook.pdfFile) {
-        pageWidth = 794;
-        pageHeight = 1123;
+      let imagePath = `${process.env.PUBLIC_URL}/books/${activeBook.id}/page-${chapter.pageNumber}.svg`;
+      // For uploaded PDFs, render the page to an image on the fly
+      if (activeBook.type === 'pdf') {
+        try {
+          imagePath = await getPdfPageDataUrl(chapter.pageNumber);
+        } catch {
+          // fallback keeps the static path attempt
+        }
       }
-      
+
       const w = window.open("", "_blank")!;
-      w.document.write(
-        renderPrintablePDFHTML(
-          activeBook.title,
-          chapter.title,
-          imagePath,
-          collageToUse,
-          pageWidth,
-          pageHeight
-        )
+      const html = renderPrintablePDFHTML(
+        activeBook.title,
+        chapter.title,
+        imagePath,
+        collageToUse
       );
+      w.document.open();
+      w.document.write(html);
       w.document.close();
       w.focus();
-      w.print();
     } else {
       const w = window.open("", "_blank")!;
-      w.document.write(
-        renderPrintableHTML(
-          activeBook.title,
-          chapter.title,
-          "text" in chapter ? chapter.text : "",
-          collageToUse
-        )
+      const html = renderPrintableHTML(
+        activeBook.title,
+        chapter.title,
+        "text" in chapter ? chapter.text : "",
+        collageToUse
       );
+      w.document.open();
+      w.document.write(html);
       w.document.close();
       w.focus();
-      w.print();
     }
   };
 
@@ -148,275 +218,81 @@ export default function ExportPDF() {
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, md: 4 }}>
         <Stack spacing={2}>
-          <Paper
-            sx={{
-              p: 3,
-              background:
-                "linear-gradient(135deg, rgba(255,255,255,0.95), rgba(249,168,212,0.3))",
-              borderRadius: 3,
-              border: "1px solid rgba(236, 72, 153, 0.2)",
-              boxShadow: "0 8px 32px rgba(236, 72, 153, 0.15)",
-            }}
-          >
-            <Typography
-              variant="h6"
-              sx={{
-                mb: 2,
-                color: "#581c87",
-                fontWeight: 700,
-                fontSize: "1rem",
-              }}
-            >
-              📦 Exportação em Lote
-            </Typography>
-            <Box sx={{ mb: 2 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  const allChapterIds = activeBook.chapters.map(c => c.id);
-                  const allSelected = allChapterIds.every(id => selectedChapters.includes(id));
-                  
-                  if (allSelected) {
-                    setSelectedChapters([]);
-                  } else {
-                    setSelectedChapters(allChapterIds);
-                  }
-                }}
-                sx={{ mb: 2, width: '100%' }}
-              >
-                {selectedChapters.length === activeBook.chapters.length ? 
-                  '❌ Desselecionar Tudo' : 
-                  '✅ Selecionar Tudo'
-                }
-              </Button>
-              
-              {activeBook.chapters.map((c) => (
-                <FormControlLabel
-                  key={c.id}
-                  control={
-                    <Checkbox
-                      checked={selectedChapters.includes(c.id)}
-                      onChange={(e) =>
-                        handleChapterSelection(c.id, e.target.checked)
-                      }
-                      size="small"
-                    />
-                  }
-                  label={c.title}
-                  sx={{
-                    display: "block",
-                    mb: 0.5,
-                    "& .MuiTypography-root": {
-                      color: "#581c87",
-                      fontWeight: 500,
-                    },
-                  }}
-                />
-              ))}
-            </Box>
-            <Button
-              variant="contained"
-              size="medium"
-              onClick={handlePrintMultiple}
-              disabled={selectedChapters.length === 0}
-              fullWidth
-              sx={{
-                py: 1.5,
-                borderRadius: 2,
-                background:
-                  selectedChapters.length > 0
-                    ? "linear-gradient(45deg, #ec4899, #d946ef)"
-                    : "rgba(156, 163, 175, 0.5)",
-                "&:hover": {
-                  background:
-                    selectedChapters.length > 0
-                      ? "linear-gradient(45deg, #be185d, #a21caf)"
-                      : "rgba(156, 163, 175, 0.5)",
-                },
-                fontWeight: 600,
-              }}
-            >
-              📥 Baixar {selectedChapters.length} capítulos
-            </Button>
-          </Paper>
-          <Paper
-            sx={{
-              p: 3,
-              background:
-                "linear-gradient(135deg, rgba(255,255,255,0.95), rgba(249,168,212,0.3))",
-              borderRadius: 3,
-              border: "1px solid rgba(236, 72, 153, 0.2)",
-              boxShadow: "0 8px 32px rgba(236, 72, 153, 0.15)",
-              height: "fit-content",
-              padding: "4px",
-            }}
-          >
-            <Typography
-              variant="h6"
-              sx={{
-                color: "#581c87",
-                fontWeight: 700,
-                fontSize: "1rem",
-              }}
-            >
-              👁️ Preview Individual
-            </Typography>
-          </Paper>
-          <Stack spacing={2}>
-            {activeBook.chapters.map((c) => (
-              <Paper
-                key={c.id}
-                sx={{
-                  p: 2.5,
-                  border:
-                    c.id === chapterId
-                      ? "2px solid #ec4899"
-                      : "1px solid rgba(236, 72, 153, 0.2)",
-                  background: "rgba(255, 255, 255, 0.9)",
-                  borderRadius: 3,
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    transform: "translateY(-2px)",
-                    boxShadow: "0 8px 24px rgba(236, 72, 153, 0.2)",
-                  },
-                }}
-                onClick={() => setChapterId(c.id)}
-              >
-                <Typography
-                  variant="subtitle1"
-                  sx={{
-                    color: "#581c87",
-                    fontWeight: 600,
-                    mb: 0.5,
-                  }}
-                >
-                  {c.title}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "#a855f7",
-                    fontWeight: 500,
-                  }}
-                >
-                  {(() => {
-                    if ("pageNumber" in c) {
-                      const pdfCollages = JSON.parse(
-                        localStorage.getItem("pdf-collages") || "{}"
-                      );
-                      const savedCollage =
-                        pdfCollages[`${activeBook.id}-${c.id}`];
-                      return savedCollage
-                        ? "✨ Editado (PDF + stickers)"
-                        : "📄 Sem edição";
-                    }
-                    return c.collage
-                      ? "✨ Editado (história + stickers)"
-                      : "📝 Sem edição";
-                  })()}
-                </Typography>
-              </Paper>
-            ))}
+        <Paper sx={{ p: 2 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1, flexWrap: 'wrap', gap: 1 }}>
+            <Typography variant="h6">Páginas</Typography>
+            <Stack direction="row" spacing={1}>
+                <Button size="small" onClick={() => setSelectedChapters([])} sx={{ minWidth: 0, px: 1, py: 0.5, fontSize: '0.75rem' }}>Limpar</Button>
+                <Button size="small" variant="outlined" onClick={() => setSelectedChapters(activeBook.chapters.map(c => c.id))} sx={{ minWidth: 0, px: 1, py: 0.5, fontSize: '0.75rem' }}>Selecionar Tudo</Button>
+            </Stack>
           </Stack>
+            <Stack spacing={1}>
+              {activeBook.chapters.map((c) => (
+                <Paper key={c.id} onClick={() => addSelect(c.id)} sx={{ p: 1, cursor: 'pointer', border: selectedChapters.includes(c.id) ? '2px solid #ec4899' : '1px solid #e5e7eb' }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Chip size="small" label={selectedChapters.indexOf(c.id) >= 0 ? `#${selectedChapters.indexOf(c.id) + 1}` : ''} />
+                    <Typography sx={{ flex: 1 }}>{c.title}</Typography>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          </Paper>
         </Stack>
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <Paper
-          sx={{
-            p: 3,
-            background:
-              "linear-gradient(135deg, rgba(255,255,255,0.95), rgba(243,232,255,0.8))",
-            borderRadius: 3,
-            border: "1px solid rgba(236, 72, 153, 0.2)",
-            boxShadow: "0 8px 32px rgba(236, 72, 153, 0.15)",
-          }}
-        >
-          <Typography
-            variant="h5"
-            sx={{
-              mb: 2,
-              color: "#581c87",
-              fontWeight: 700,
-              textAlign: "center",
-            }}
-          >
-            📖 {chapter?.title}
-          </Typography>
-          {chapter && "pageNumber" in chapter ? (
-            <Paper
-              key={refreshKey}
-              sx={{
-                p: 2,
-                height: 360,
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              <PDFViewer
-                bookId={activeBook.id}
-                pageNumber={chapter.pageNumber}
-                pdfFile={activeBook.type === 'pdf' ? activeBook.pdfFile : undefined}
-              />
-              {(() => {
-                const pdfCollages = JSON.parse(
-                  localStorage.getItem("pdf-collages") || "{}"
-                );
-                const savedCollage =
-                  pdfCollages[`${activeBook.id}-${chapter.id}`];
-                return (savedCollage?.items ?? []).map((it: any) => (
-                  <div
-                    key={`${it.id}-${refreshKey}`}
-                    style={{
-                      position: "absolute",
-                      left: `${it.x * 100}%`,
-                      top: `${it.y * 100}%`,
-                      transform: "translate(-50%,-50%)",
-                      fontSize: 20,
-                      zIndex: 10,
-                    }}
-                  >
-                    {it.emoji.startsWith("data:image/svg+xml") ? (
-                      <img
-                        src={it.emoji}
-                        alt="Custom sticker"
-                        style={{ width: 20, height: 20 }}
-                      />
+      <Grid size={{ xs: 12, md: 8 }}>
+        <Paper sx={{ p: 2 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="h6">Pré-visualização</Typography>
+            <Button variant="contained" onClick={handlePrintMultiple} disabled={selectedChapters.length === 0}>Imprimir {selectedChapters.length} página(s)</Button>
+          </Stack>
+          <Box sx={{ maxHeight: 640, overflowY: 'auto' }}>
+            {selectedChapters.length === 0 && (
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>Selecione páginas para pré-visualizar e exportar.</Typography>
+            )}
+            <Stack spacing={2}>
+              {selectedChapters.map((id) => {
+                const c = activeBook.chapters.find((ch) => ch.id === id);
+                if (!c) return null;
+                let collageToUse = c.collage;
+                if ('pageNumber' in c) {
+                  const pdfCollages = JSON.parse(localStorage.getItem('pdf-collages') || '{}');
+                  const saved = pdfCollages[`${activeBook.id}-${c.id}`];
+                  collageToUse = saved || c.collage;
+                }
+                const img = previewImages[id];
+                return (
+                  <Box key={id} sx={{ position: 'relative', border: '1px solid #e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => removeSelect(id)}
+                      sx={{ position: 'absolute', top: 8, right: 8, zIndex: 20, minWidth: 0, p: '2px 6px' }}
+                    >
+                      ✖
+                    </Button>
+                    {img ? (
+                      <img src={img} alt={c.title} style={{ width: '100%', display: 'block' }} />
                     ) : (
-                      it.emoji
+                      <Box sx={{ p: 4, textAlign: 'center' }}>
+                        <Typography variant="caption">Carregando prévia...</Typography>
+                      </Box>
                     )}
-                  </div>
-                ));
-              })()}
-            </Paper>
-          ) : (
-            <StoryPreview
-              key={refreshKey}
-              text={chapter && "text" in chapter ? chapter.text : ""}
-              collage={chapter?.collage}
-              height={360}
-            />
-          )}
-          <Button
-            sx={{
-              mt: 3,
-              py: 1.5,
-              borderRadius: 2,
-              background: "linear-gradient(45deg, #ec4899, #d946ef)",
-              "&:hover": {
-                background: "linear-gradient(45deg, #be185d, #a21caf)",
-                transform: "translateY(-2px)",
-              },
-              fontWeight: 600,
-              fontSize: "1rem",
-            }}
-            variant="contained"
-            onClick={handlePrint}
-            fullWidth
-          >
-            📄 Baixar capítulo (PDF)
-          </Button>
+                    <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                      {(collageToUse?.items ?? []).map((it: any) => (
+                        <div key={it.id} style={{ position: 'absolute', left: `${it.x * 100}%`, top: `${it.y * 100}%`, transform: 'translate(-50%,-50%)', fontSize: 20, zIndex: 10 }}>
+                          {typeof it.emoji === 'string' && it.emoji.startsWith('data:image/svg+xml') ? (
+                            <img src={it.emoji} alt="Custom sticker" style={{ width: 20, height: 20 }} />
+                          ) : (
+                            it.emoji
+                          )}
+                        </div>
+                      ))}
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Stack>
+          </Box>
         </Paper>
       </Grid>
     </Grid>
@@ -511,6 +387,22 @@ body{
   <img src="${imagePath}" alt="Página do livro" class="pdf-image"/>
   <div class="stickers-overlay">${items}</div>
 </div>
+<script>
+  (function(){
+    function printWhenReady(){
+      var imgs = Array.from(document.images||[]);
+      if(imgs.length===0){ window.print(); return; }
+      var remaining = imgs.length;
+      var done = function(){ if(--remaining===0){ window.print(); } };
+      imgs.forEach(function(img){
+        if (img.complete) { done(); }
+        else { img.addEventListener('load', done); img.addEventListener('error', done); }
+      });
+      setTimeout(function(){ if(remaining>0) window.print(); }, 2000);
+    }
+    window.addEventListener('load', printWhenReady);
+  })();
+</script>
 </body></html>`;
 }
 
@@ -579,5 +471,108 @@ body{margin:0;background:#fff;color:#000;font-family:system-ui}
 .pdf-image{width:100%;height:100%;object-fit:contain;border-radius:0;}
 @media print { .page { page-break-after: always; } }
 </style>
-</head><body>${pagesHTML}</body></html>`;
+</head><body>${pagesHTML}
+<script>
+  (function(){
+    function printWhenReady(){
+      var imgs = Array.from(document.images||[]);
+      if(imgs.length===0){ window.print(); return; }
+      var remaining = imgs.length;
+      var done = function(){ if(--remaining===0){ window.print(); } };
+      imgs.forEach(function(img){
+        if (img.complete) { done(); }
+        else { img.addEventListener('load', done); img.addEventListener('error', done); }
+      });
+      setTimeout(function(){ if(remaining>0) window.print(); }, 2000);
+    }
+    window.addEventListener('load', printWhenReady);
+  })();
+</script>
+</body></html>`;
+}
+
+function renderMultipleChaptersHTMLDynamic(
+  bookTitle: string,
+  chapters: Chapter[],
+  bookId: string,
+  imageMap: Record<string, string>
+) {
+  const pagesHTML = chapters
+    .map((chapter) => {
+      let collageToUse = chapter.collage;
+
+      if ("pageNumber" in chapter) {
+        const pdfCollages = JSON.parse(
+          localStorage.getItem("pdf-collages") || "{}"
+        );
+        const savedCollage = pdfCollages[`${bookId}-${chapter.id}`];
+        collageToUse = savedCollage || chapter.collage;
+
+        const imagePath = imageMap[chapter.id];
+        const items = (collageToUse?.items ?? [])
+          .map((it) => {
+            const emojiContent = it.emoji.startsWith("data:image/svg+xml")
+              ? `<img src="${it.emoji}" alt="Custom sticker" style="width:28px;height:28px;"/>`
+              : it.emoji;
+            return `<div style="position:absolute;left:${
+              it.x * 100
+            }%;top:${
+              it.y * 100
+            }%;transform:translate(-50%,-50%);font-size:28px;z-index:10;">${emojiContent}</div>`;
+          })
+          .join("");
+
+        return `<section class="page"><div class="story"><img src="${imagePath}" alt="Página do livro" class="pdf-image"/>${items}</div></section>`;
+      } else {
+        const items = (collageToUse?.items ?? [])
+          .map(
+            (it) =>
+              `<div style="position:absolute;left:${it.x * 100}%;top:${
+                it.y * 100
+              }%;transform:translate(-50%,-50%);font-size:28px;">${
+                it.emoji
+              }</div>`
+          )
+          .join("");
+
+        const escape = (s: string) =>
+          s.replace(
+            /[&<>]/g,
+            (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]!)
+          );
+
+        const text = "text" in chapter ? chapter.text : "";
+        return `<section class="page"><div class="story"><p>${escape(
+          text
+        )}</p>${items}</div></section>`;
+      }
+    })
+    .join("");
+
+  return `<!doctype html><html><head><meta charset="utf-8"/><title>${bookTitle} - Compilado</title>
+<style>
+body{margin:0;background:#fff;color:#000;font-family:system-ui} 
+.page{min-height:100vh;padding:0;page-break-after:always} 
+.story{position:relative;background:#fff;border:none;border-radius:0;padding:0;min-height:100vh;display:flex;justify-content:center;align-items:center;} 
+.pdf-image{width:100%;height:100%;object-fit:contain;border-radius:0;}
+@media print { .page { page-break-after: always; } }
+</style>
+</head><body>${pagesHTML}
+<script>
+  (function(){
+    function printWhenReady(){
+      var imgs = Array.from(document.images||[]);
+      if(imgs.length===0){ window.print(); return; }
+      var remaining = imgs.length;
+      var done = function(){ if(--remaining===0){ window.print(); } };
+      imgs.forEach(function(img){
+        if (img.complete) { done(); }
+        else { img.addEventListener('load', done); img.addEventListener('error', done); }
+      });
+      setTimeout(function(){ if(remaining>0) window.print(); }, 2000);
+    }
+    window.addEventListener('load', printWhenReady);
+  })();
+</script>
+</body></html>`;
 }

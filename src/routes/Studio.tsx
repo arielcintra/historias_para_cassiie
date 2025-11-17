@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Grid, Button, Stack, Typography, Tooltip } from "@mui/material";
+import { Grid, Button, Stack, Typography, Tooltip, CircularProgress } from "@mui/material";
 import { Delete, Add } from "@mui/icons-material";
 import { useBooks } from "../store/booksContext.tsx";
 import StickerTray from "../components/StickerTray.tsx";
@@ -23,6 +23,8 @@ export default function Studio() {
   const chapter = activeBook?.chapters.find((c) => c.id === chapterId);
   const ref = useRef<StickerCanvasHandle>(null);
   const [showStickerTray, setShowStickerTray] = useState(true);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [isManualSaving, setIsManualSaving] = useState(false);
 
   if (!activeBook) return <Typography>Selecione um livro.</Typography>;
 
@@ -50,9 +52,13 @@ export default function Studio() {
           </Typography>
           <Button
             variant="contained"
-            onClick={() =>
-              chapterId && saveCollage(chapterId, ref.current?.toCollage())
-            }
+            onClick={async () => {
+              if (!chapterId) return;
+              setIsManualSaving(true);
+              await Promise.resolve(saveCollage(chapterId, ref.current?.toCollage()));
+              // give a tiny delay to show feedback
+              setTimeout(() => setIsManualSaving(false), 300);
+            }}
             sx={{
               borderRadius: 2,
               px: 3,
@@ -64,8 +70,15 @@ export default function Studio() {
               },
               fontWeight: 600
             }}
+            disabled={isAutoSaving || isManualSaving}
           >
-            💾 Salvar
+            {(isAutoSaving || isManualSaving) ? (
+              <>
+                <CircularProgress size={18} sx={{ mr: 1 }} /> Salvando...
+              </>
+            ) : (
+              <>💾 Salvar</>
+            )}
           </Button>
         </Stack>
         <StickerCanvas
@@ -73,6 +86,7 @@ export default function Studio() {
           text={(chapter && 'text' in chapter) ? chapter.text : ""}
           initial={chapter?.collage}
           chapter={chapter}
+          onAutoSaveStatusChange={setIsAutoSaving}
         />
         <Stack direction="row" spacing={2} sx={{ mt: 3, alignItems: 'center', justifyContent: 'center' }}>
           <Button

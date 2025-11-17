@@ -10,6 +10,9 @@ import type { Book, Collage, Role, TextBook, TextChapter, PDFBook, PDFChapter } 
 import { usePDFBooks } from "../hooks/usePDFBooks.tsx";
 import { LocalStorage, STORAGE_KEYS } from "../utils/localStorage.ts";
 import { usePDFCollages } from "../hooks/usePDFCollages.ts";
+import { isSignedIn } from "../services/googleAuth.ts";
+import { getDriveContext, ensureBookFolder, uploadOrUpdateBinary } from "../services/googleDrive.ts";
+import { getPageStorage } from "../storage/index.ts";
 
 const textSeed: TextBook[] = [
   {
@@ -39,6 +42,7 @@ interface BooksContextShape {
   setActiveBookId: (id: string) => void;
   activeBook?: Book;
   saveCollage: (chapterId: string, collage?: Collage) => void;
+  deleteBook: (bookId: string) => void;
   createBook: (
     title: string,
     chapters: Pick<TextChapter, "title" | "text">[]
@@ -163,7 +167,7 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
     const chapters: PDFChapter[] = [];
     
     for (let i = 1; i <= totalPages; i++) {
-      const chapterTitle = chapterTitles?.[i - 1] || `Capítulo ${i}`;
+      const chapterTitle = chapterTitles?.[i - 1] || `Pagina ${i}`;
       chapters.push({
         id: `${bookId}-chapter-${i}`,
         title: chapterTitle,
@@ -178,15 +182,31 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
       totalPages,
       chapters,
       type: 'pdf',
+      // Attach the file immediately so the Studio can render right away.
+      // This field is stripped before persisting to localStorage below.
+      pdfFile: pdfFile ?? undefined,
     };
     
     // Store PDF file separately
     if (pdfFile) {
       setPdfFiles(prev => ({ ...prev, [bookId]: pdfFile }));
     }
-    
+
     setDynamicPdfBooks((prev) => [...prev, nb]);
     setActiveBookId(nb.id);
+
+    // If Drive is connected, upload source PDF to CassUniverse/book-{id}/source.pdf
+    if (pdfFile && isSignedIn()) {
+      (async () => {
+        try {
+          const ctx = getDriveContext();
+          const folderId = await ensureBookFolder(ctx, bookId);
+          await uploadOrUpdateBinary(ctx, folderId, 'source.pdf', pdfFile);
+        } catch (e) {
+          console.warn('Falha ao enviar PDF ao Drive:', e);
+        }
+      })();
+    }
   };
 
   const value: BooksContextShape = {
@@ -197,6 +217,41 @@ export function BooksProvider({ children }: { children: React.ReactNode }) {
     setActiveBookId,
     activeBook,
     saveCollage,
+    deleteBook: (bookId: string) => {
+      const book = books.find(b => b.id === bookId);
+      if (!book) return;
+
+      // Remove from proper collection
+      if (book.type === 'text') {
+        setTextBooks(prev => prev.filter(b => b.id !== bookId));
+      } else {
+        setDynamicPdfBooks(prev => prev.filter(b => b.id !== bookId));
+        // Drop in-memory file ref
+        setPdfFiles(prev => {
+          const { [bookId]: _, ...rest } = prev;
+          return rest;
+        });
+        // Remove any saved PDF collages for this book
+        const collages = LocalStorage.get(
+          STORAGE_KEYS.PDF_COLLAGES,
+          {} as Record<string, Collage>
+        );
+        const next: Record<string, Collage> = {};
+        for (const key of Object.keys(collages)) {
+          if (!key.startsWith(`${bookId}-`)) next[key] = collages[key];
+        }
+        LocalStorage.set(STORAGE_KEYS.PDF_COLLAGES, next);
+        // Remove cached previews (Drive or Local)
+        getPageStorage().removeBook(bookId).catch(() => {});
+      }
+
+      // Adjust active selection if needed
+      if (activeBookId === bookId) {
+        // Compute next available book id after removal
+        const remaining = books.filter(b => b.id !== bookId);
+        setActiveBookId(remaining[0]?.id);
+      }
+    },
     createBook,
     createPDFBook,
   };

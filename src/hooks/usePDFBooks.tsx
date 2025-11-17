@@ -12,7 +12,7 @@ export function usePDFBooks() {
     for (let i = 1; i <= totalPages; i++) {
       chapters.push({
         id: `${bookId}-chapter-${i}`,
-        title: `Capítulo ${i}`,
+        title: `Pagina ${i}`,
         pageNumber: i,
       });
     }

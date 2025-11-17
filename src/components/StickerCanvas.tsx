@@ -1,7 +1,9 @@
 import React, { useImperativeHandle, useRef, useState, useEffect } from "react";
 import { Alert, AlertTitle, Button, Paper, Typography, Box } from "@mui/material";
+import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import type { Collage, StickerItem, Chapter } from "../types";
 import PDFViewer from "./PDFViewer.tsx";
+import PDFReader from "./PDFReader.tsx";
 import { useBooks } from "../store/booksContext.tsx";
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
@@ -13,14 +15,16 @@ export interface StickerCanvasHandle {
 }
 export default React.forwardRef<
   StickerCanvasHandle,
-  { text: string; initial?: Collage; chapter?: Chapter }
->(function StickerCanvas({ text, initial, chapter }, ref) {
+  { text: string; initial?: Collage; chapter?: Chapter; onAutoSaveStatusChange?: (saving: boolean) => void }
+>(function StickerCanvas({ text, initial, chapter, onAutoSaveStatusChange }, ref) {
   const { activeBook } = useBooks();
   const [items, setItems] = useState<StickerItem[]>(initial?.items ?? []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<string | null>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const saveTimer = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (chapter && 'pageNumber' in chapter) {
@@ -31,6 +35,7 @@ export default React.forwardRef<
       setItems(initial?.items ?? []);
     }
     setSelectedId(null);
+    mountedRef.current = false; // reset mount flag so first items effect doesn't autosave
   }, [initial, chapter]);
 
   useEffect(() => {
@@ -139,12 +144,46 @@ export default React.forwardRef<
 
   const isPDFChapter = chapter && 'pageNumber' in chapter;
   const bookId = chapter?.id.split('-chapter-')[0];
+  const totalPages = activeBook?.type === 'pdf' ? (activeBook as any).totalPages : undefined;
+
+  const [readerOpen, setReaderOpen] = useState(false);
+  const [readerPage, setReaderPage] = useState<number>(isPDFChapter ? (chapter as any).pageNumber : 1);
+
+  useEffect(() => {
+    if (isPDFChapter) {
+      setReaderPage((chapter as any).pageNumber);
+    }
+  }, [isPDFChapter, chapter]);
+
+  // Page state used to seed the floating reader
 
   console.log('StickerCanvas: chapter:', chapter);
   console.log('StickerCanvas: activeBook:', activeBook);
   console.log('StickerCanvas: isPDFChapter:', isPDFChapter);
   console.log('StickerCanvas: bookId:', bookId);
   console.log('StickerCanvas: pdfFile exists:', !!(activeBook?.type === 'pdf' && activeBook.pdfFile));
+
+  // Autosave when items change (debounced)
+  const { saveCollage } = useBooks();
+  useEffect(() => {
+    if (!chapter) return;
+    if (!mountedRef.current) {
+      mountedRef.current = true; // skip initial set
+      return;
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    onAutoSaveStatusChange?.(true);
+    saveTimer.current = setTimeout(() => {
+      try {
+        saveCollage(chapter.id, { id: "col-" + Date.now(), items });
+      } finally {
+        onAutoSaveStatusChange?.(false);
+      }
+    }, 600);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [items]);
 
   return (
     <Paper
@@ -154,9 +193,22 @@ export default React.forwardRef<
       onClick={onCanvasClick}
       sx={{ p: 2, minHeight: 380, position: "relative" }}
     >
-      <Typography variant="subtitle1" sx={{ mb: 0.5 }}>
-        Prévia da história
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+        <Typography variant="subtitle1">
+          Prévia da história
+        </Typography>
+        {isPDFChapter && bookId && (
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<ZoomOutMapIcon />}
+            onClick={() => setReaderOpen(true)}
+            sx={{ alignSelf: 'flex-start' }}
+          >
+            Maximizar
+          </Button>
+        )}
+      </Box>
       
       {isPDFChapter && bookId ? (
         <Box sx={{ position: 'relative', mt: 2 }}>
@@ -165,6 +217,17 @@ export default React.forwardRef<
             pageNumber={chapter.pageNumber}
             pdfFile={activeBook?.type === 'pdf' ? activeBook.pdfFile : undefined}
           />
+
+          {readerOpen && totalPages && (
+            <PDFReader
+              open={readerOpen}
+              onClose={() => setReaderOpen(false)}
+              bookId={bookId}
+              totalPages={totalPages}
+              initialPage={readerPage}
+              pdfFile={activeBook?.type === 'pdf' ? activeBook.pdfFile : undefined}
+            />
+          )}
         </Box>
       ) : (
         <Typography variant="body2" sx={{ opacity: 0.9, mt: 2 }}>

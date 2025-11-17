@@ -6,20 +6,12 @@ let workerInitialized = false;
 export const initializePDFWorker = () => {
   if (!workerInitialized) {
     try {
-      // Try different worker configurations in order of preference
-      
-      // Option 1: Use the matching version worker from CDN
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.worker.min.js';
-      console.log('PDF.js worker initialized with CDN version 5.4.149');
-      
-    } catch (error) {
-      console.warn('CDN worker failed, trying alternative:', error);
-      
-      // Option 2: Fallback to a stable version
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      console.log('PDF.js worker initialized with fallback version 3.11.174');
+      // Prefer a local worker shipped in /public to avoid CDN/cross-origin issues.
+      // If the worker fails to load or versions mismatch, loadPDFDocument falls back to disableWorker.
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.min.js`;
+    } catch {
+      // Ignore; loadPDFDocument will disable worker if needed
     }
-    
     workerInitialized = true;
   }
   return pdfjsLib;
@@ -29,18 +21,14 @@ export const loadPDFDocument = async (data: ArrayBuffer) => {
   const pdfjsLib = initializePDFWorker();
   
   try {
-    return await pdfjsLib.getDocument({ 
+    return await pdfjsLib.getDocument({
       data,
-      // Disable worker as fallback if worker loading fails
       disableWorker: false,
-      // Add additional options for better compatibility
-      verbosity: 0 // Reduce console spam
+      verbosity: 0
     }).promise;
   } catch (error) {
-    console.warn('PDF loading with worker failed, trying without worker:', error);
-    
-    // Fallback: Disable worker entirely
-    return await pdfjsLib.getDocument({ 
+    // Fallback: Disable worker entirely (slower but reliable when worker fails to load)
+    return await pdfjsLib.getDocument({
       data,
       disableWorker: true,
       verbosity: 0

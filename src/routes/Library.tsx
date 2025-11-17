@@ -18,9 +18,10 @@ import {
 } from "@mui/material";
 import { Add, CloudUpload } from "@mui/icons-material";
 import { useBooks } from "../store/booksContext.tsx";
+import { loadPDFDocument } from "../utils/pdfUtils.ts";
 
 export default function Library() {
-  const { activeBook, role, createBook, createPDFBook } = useBooks();
+  const { activeBook, role, createBook, createPDFBook, deleteBook } = useBooks();
   const [newBookDialog, setNewBookDialog] = useState(false);
   const [newBookTitle, setNewBookTitle] = useState("");
   const [newChapterTitle, setNewChapterTitle] = useState("");
@@ -53,25 +54,28 @@ export default function Library() {
     if (!files || files.length === 0) return;
 
     const file = files[0];
-    if (file.type !== 'application/pdf') {
+    const isPDF = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if (!isPDF) {
       setUploadStatus(`Erro: ${file.name} não é um arquivo PDF válido`);
       return;
     }
 
     setUploadStatus("Analisando PDF...");
-    
+
     try {
-      const totalPages = Math.floor(Math.random() * 10) + 5;
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await loadPDFDocument(arrayBuffer);
+      const totalPages = pdf.numPages;
       const bookTitle = file.name.replace('.pdf', '').replace(/[-_]/g, ' ');
-      const chapterTitles = Array.from({ length: totalPages }, (_, i) => `Capítulo ${i + 1}`);
-      
+      const chapterTitles = Array.from({ length: totalPages }, (_, i) => `Pagina ${i + 1}`);
+
       setPdfConfig({
         file,
         title: bookTitle,
         totalPages,
         chapterTitles
       });
-      
+
       setUploadStatus(`PDF analisado: ${totalPages} páginas detectadas`);
     } catch (error) {
       setUploadStatus(`Erro ao processar ${file.name}: ${error}`);
@@ -114,13 +118,26 @@ export default function Library() {
   return (
     <Box>
       {role === "admin" && (
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 3, display: 'flex', gap: 1 }}>
           <Button
             variant="contained"
             startIcon={<Add />}
             onClick={() => setNewBookDialog(true)}
           >
             Novo Livro
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => {
+              if (!activeBook) return;
+              const confirmDelete = window.confirm(`Deletar o livro "${activeBook.title}"? Esta ação não pode ser desfeita.`);
+              if (confirmDelete) {
+                deleteBook(activeBook.id);
+              }
+            }}
+          >
+            Deletar Livro
           </Button>
         </Box>
       )}
@@ -258,7 +275,7 @@ export default function Library() {
                         fullWidth
                       />
                       <Typography variant="subtitle2">
-                        📖 Páginas: {pdfConfig.totalPages} - Configure os títulos dos capítulos:
+                        📖 Páginas: {pdfConfig.totalPages} - Configure os títulos das páginas:
                       </Typography>
                       <Grid container spacing={1}>
                         {pdfConfig.chapterTitles.map((title, i) => (

@@ -28,6 +28,7 @@ export const LocalStorage = {
 export const STORAGE_KEYS = {
   BOOKS: 'celestial-books-mui-ts-v1',
   PDF_COLLAGES: 'pdf-collages',
+  PDF_PREVIEWS: 'pdf-previews',
   TASK_NOTEBOOK_DATA: 'task-notebook-data',
   TASK_NOTEBOOK_VERSION: 'task-notebook-version',
   TASK_NOTEBOOK_CUSTOM_IMAGES: 'task-notebook-custom-images'

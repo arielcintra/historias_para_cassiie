@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Box, CircularProgress, Alert, Typography } from '@mui/material';
 import { loadPDFDocument, renderPDFPageToCanvas } from '../utils/pdfUtils.ts';
+import { getPageStorage } from '../storage/index.ts';
+import { getDriveContext, ensureBookFolder, downloadFileBlob } from '../services/googleDrive.ts';
 
 interface PDFViewerProps {
   bookId: string;
@@ -23,12 +25,58 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
         setError('');
 
         if (pdfFile) {
-          console.log('PDFViewer: Renderizando PDF direto');
-          await renderPDFPage(pdfFile, pageNumber);
-        } else {
-          console.log('PDFViewer: Tentando carregar imagens estáticas');
-          await loadStaticImages();
-        }
+        console.log('PDFViewer: Renderizando PDF direto');
+        await renderPDFPage(pdfFile, pageNumber);
+      } else {
+          // Try cached preview first
+          const isDynamic = /^pdf-/.test(bookId);
+          try {
+            const cached = await getPageStorage().getPage(bookId, pageNumber);
+            if (cached) {
+              setImageUrl(cached);
+              onPageLoad?.(cached);
+              setLoading(false);
+            } else {
+              if (isDynamic) {
+                // Try Drive source.pdf for dynamic books when no preview exists
+                try {
+                  const ctx = getDriveContext();
+                  const folderId = await ensureBookFolder(ctx, bookId);
+                  const blob = await downloadFileBlob(ctx, folderId, 'source.pdf');
+                  if (blob) {
+                    const arrayBuffer = await blob.arrayBuffer();
+                    const pdf = await loadPDFDocument(arrayBuffer);
+                    if (pageNumber > pdf.numPages) {
+                      setError(`Página ${pageNumber} não existe. PDF tem ${pdf.numPages} páginas.`);
+                      setLoading(false);
+                      return;
+                    }
+                    const pdfPage = await pdf.getPage(pageNumber);
+                    const canvas = canvasRef.current ?? document.createElement('canvas');
+                    const dataUrl = await renderPDFPageToCanvas(pdfPage, canvas);
+                    setImageUrl(dataUrl);
+                    getPageStorage().setPage(bookId, pageNumber, dataUrl).catch(() => {});
+                    onPageLoad?.(dataUrl);
+                    setLoading(false);
+                  } else {
+                    setLoading(false);
+                  }
+                } catch {
+                  setLoading(false);
+                }
+              } else {
+                console.log('PDFViewer: Tentando carregar imagens estáticas');
+                await loadStaticImages();
+              }
+            }
+          } catch {
+            if (isDynamic) {
+              setLoading(false);
+            } else {
+              await loadStaticImages();
+            }
+          }
+      }
 
       } catch (err) {
         console.error('Erro ao carregar página:', err);
@@ -71,7 +119,8 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
         }
 
         const pdfPage = await pdf.getPage(page);
-        const canvas = canvasRef.current;
+        // Use DOM canvas if available; fallback to an offscreen canvas to avoid ref timing issues
+        const canvas = canvasRef.current ?? document.createElement('canvas');
         
         if (!canvas) {
           setError('Canvas não disponível');
@@ -81,6 +130,9 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
 
         const dataUrl = await renderPDFPageToCanvas(pdfPage, canvas);
         setImageUrl(dataUrl);
+        // Persist preview for future sessions
+        // Save preview via configured storage (Drive or Local)
+        getPageStorage().setPage(bookId, page, dataUrl).catch(() => {});
         
         if (onPageLoad) {
           onPageLoad(dataUrl);
@@ -89,7 +141,9 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
         setLoading(false);
       } catch (error) {
         console.error('Erro ao renderizar PDF:', error);
-        await loadStaticImages();
+        // Não use imagens estáticas quando há um arquivo PDF – evita erro enganoso.
+        setError('Não foi possível renderizar a página do PDF.');
+        setLoading(false);
       }
     };
 
@@ -125,17 +179,6 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
 
     loadPDFPage();
   }, [bookId, pageNumber, onPageLoad, pdfFile]);
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: 200 }}>
-        <CircularProgress />
-        <Typography variant="caption" sx={{ mt: 1 }}>
-          {pdfFile ? 'Renderizando página do PDF...' : 'Carregando página...'}
-        </Typography>
-      </Box>
-    );
-  }
 
   if (error) {
     return (
@@ -173,6 +216,17 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
             borderRadius: '8px'
           }}
         />
+      )}
+
+      {loading && (
+        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', pointerEvents: 'none' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <CircularProgress />
+            <Typography variant="caption" sx={{ mt: 1 }}>
+              {pdfFile ? 'Renderizando página do PDF...' : 'Carregando página...'}
+            </Typography>
+          </Box>
+        </Box>
       )}
     </Box>
   );
