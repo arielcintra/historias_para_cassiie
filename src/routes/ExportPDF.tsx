@@ -8,7 +8,7 @@ import { getPageStorage } from "../storage/index.ts";
 export default function ExportPDF() {
   const { activeBook } = useBooks();
   const [chapterId, setChapterId] = useState<string | undefined>();
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [, setRefreshKey] = useState(0);
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [previewImages, setPreviewImages] = useState<Record<string, string>>({});
 
@@ -20,8 +20,6 @@ export default function ExportPDF() {
       }
     }
   }, [activeBook, chapterId]);
-
-  const chapter = activeBook?.chapters.find((c) => c.id === chapterId);
 
   const refreshPreview = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
@@ -163,55 +161,6 @@ export default function ExportPDF() {
     w.document.close();
     w.focus();
     // window.print() will be triggered by the HTML's script after images load
-  };
-
-  const handlePrint = async () => {
-    if (!chapter) return;
-
-    let collageToUse = chapter.collage;
-    if ("pageNumber" in chapter) {
-      const pdfCollages = JSON.parse(
-        localStorage.getItem("pdf-collages") || "{}"
-      );
-      const savedCollage = pdfCollages[`${activeBook.id}-${chapter.id}`];
-      collageToUse = savedCollage || chapter.collage;
-    }
-
-    if ("pageNumber" in chapter) {
-      let imagePath = `${process.env.PUBLIC_URL}/books/${activeBook.id}/page-${chapter.pageNumber}.svg`;
-      // For uploaded PDFs, render the page to an image on the fly
-      if (activeBook.type === 'pdf') {
-        try {
-          imagePath = await getPdfPageDataUrl(chapter.pageNumber);
-        } catch {
-          // fallback keeps the static path attempt
-        }
-      }
-
-      const w = window.open("", "_blank")!;
-      const html = renderPrintablePDFHTML(
-        activeBook.title,
-        chapter.title,
-        imagePath,
-        collageToUse
-      );
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-    } else {
-      const w = window.open("", "_blank")!;
-      const html = renderPrintableHTML(
-        activeBook.title,
-        chapter.title,
-        "text" in chapter ? chapter.text : "",
-        collageToUse
-      );
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-    }
   };
 
   return (
