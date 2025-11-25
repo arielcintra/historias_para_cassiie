@@ -25,15 +25,27 @@ export function usePDFBooks() {
       setLoading(true);
       setError('');
 
-      const booksConfig = [
-        { id: 'livro1', title: 'Aventura Espacial', pages: 2 },
-        { id: 'livro2', title: 'Jardim das Estrelas', pages: 2 }
-      ];
+      // Fetch manifest.json from public/books
+      const manifestUrl = `${process.env.PUBLIC_URL}/books/manifest.json`;
+      const response = await fetch(manifestUrl);
+
+      if (!response.ok) {
+        console.warn('Manifest not found, no static PDF books available');
+        setPdfBooks([]);
+        return;
+      }
+
+      const booksConfig: Array<{
+        id: string;
+        title: string;
+        filename: string;
+        pages: number;
+      }> = await response.json();
 
       const books: PDFBook[] = booksConfig.map(config => ({
         id: config.id,
         title: config.title,
-        pdfPath: `${process.env.PUBLIC_URL}/books/${config.id}.pdf`,
+        pdfPath: `${process.env.PUBLIC_URL}/books/${config.filename}`,
         totalPages: config.pages,
         chapters: createChaptersFromPages(config.pages, config.id),
         type: 'pdf'
@@ -43,6 +55,7 @@ export function usePDFBooks() {
     } catch (err) {
       console.error('Erro ao carregar livros PDF:', err);
       setError('Erro ao carregar livros');
+      setPdfBooks([]);
     } finally {
       setLoading(false);
     }

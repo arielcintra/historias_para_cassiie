@@ -212,10 +212,11 @@ export default React.forwardRef<
       
       {isPDFChapter && bookId ? (
         <Box sx={{ position: 'relative', mt: 2 }}>
-          <PDFViewer 
-            bookId={bookId} 
+          <PDFViewer
+            bookId={bookId}
             pageNumber={chapter.pageNumber}
             pdfFile={activeBook?.type === 'pdf' ? activeBook.pdfFile : undefined}
+            pdfPath={activeBook?.type === 'pdf' ? activeBook.pdfPath : undefined}
           />
 
           {readerOpen && totalPages && (
@@ -226,6 +227,7 @@ export default React.forwardRef<
               totalPages={totalPages}
               initialPage={readerPage}
               pdfFile={activeBook?.type === 'pdf' ? activeBook.pdfFile : undefined}
+              pdfPath={activeBook?.type === 'pdf' ? activeBook.pdfPath : undefined}
             />
           )}
         </Box>

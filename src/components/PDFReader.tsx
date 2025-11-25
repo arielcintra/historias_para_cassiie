@@ -12,6 +12,7 @@ export default function PDFReader({
   totalPages,
   initialPage = 1,
   pdfFile,
+  pdfPath,
 }: {
   open: boolean;
   onClose: () => void;
@@ -19,6 +20,7 @@ export default function PDFReader({
   totalPages: number;
   initialPage?: number;
   pdfFile?: File;
+  pdfPath?: string;
 }) {
   const [page, setPage] = useState(Math.max(1, initialPage));
 
@@ -99,7 +101,7 @@ export default function PDFReader({
             boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
             position: 'relative',
           }}>
-            <PDFViewer bookId={bookId} pageNumber={leftPage} pdfFile={pdfFile} />
+            <PDFViewer bookId={bookId} pageNumber={leftPage} pdfFile={pdfFile} pdfPath={pdfPath} />
             <Box sx={{ position: 'absolute', top: 0, right: -8, width: 16, height: '100%', filter: 'blur(4px)', background: 'linear-gradient(90deg, rgba(0,0,0,0.06), transparent)' }} />
           </Box>
           {rightPage && (
@@ -110,7 +112,7 @@ export default function PDFReader({
               boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
               position: 'relative',
             }}>
-              <PDFViewer bookId={bookId} pageNumber={rightPage} pdfFile={pdfFile} />
+              <PDFViewer bookId={bookId} pageNumber={rightPage} pdfFile={pdfFile} pdfPath={pdfPath} />
               <Box sx={{ position: 'absolute', top: 0, left: -8, width: 16, height: '100%', filter: 'blur(4px)', background: 'linear-gradient(270deg, rgba(0,0,0,0.06), transparent)' }} />
             </Box>
           )}

@@ -8,9 +8,10 @@ interface PDFViewerProps {
   pageNumber: number;
   onPageLoad?: (imageUrl: string) => void;
   pdfFile?: File;
+  pdfPath?: string;
 }
 
-export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: PDFViewerProps) {
+export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile, pdfPath }: PDFViewerProps) {
   const [imageUrl, setImageUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -24,33 +25,26 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
         setError('');
 
         if (pdfFile) {
-        console.log('PDFViewer: Renderizando PDF direto');
+        console.log('PDFViewer: Renderizando PDF direto do arquivo');
         await renderPDFPage(pdfFile, pageNumber);
-      } else {
-          // Try cached preview first
-          const isDynamic = /^pdf-/.test(bookId);
-          try {
-            const cached = await getPageStorage().getPage(bookId, pageNumber);
-            if (cached) {
-              setImageUrl(cached);
-              onPageLoad?.(cached);
-              setLoading(false);
-            } else {
-              if (isDynamic) {
-                // No cached preview for dynamic books
-                setLoading(false);
-              } else {
-                console.log('PDFViewer: Tentando carregar imagens estáticas');
-                await loadStaticImages();
-              }
-            }
-          } catch {
-            if (isDynamic) {
-              setLoading(false);
-            } else {
-              await loadStaticImages();
-            }
+      } else if (pdfPath) {
+        // Try to load PDF from public path
+        console.log('PDFViewer: Carregando PDF de:', pdfPath);
+        try {
+          const response = await fetch(pdfPath);
+          if (response.ok) {
+            const blob = await response.blob();
+            await renderPDFPage(blob, pageNumber);
+          } else {
+            throw new Error(`Failed to fetch PDF: ${response.status}`);
           }
+        } catch (err) {
+          console.error('Erro ao carregar PDF do caminho:', err);
+          // Fallback to cached or static images
+          await tryLoadCachedOrStatic();
+        }
+      } else {
+        await tryLoadCachedOrStatic();
       }
 
       } catch (err) {
@@ -60,16 +54,39 @@ export default function PDFViewer({ bookId, pageNumber, onPageLoad, pdfFile }: P
       }
     };
 
-    const renderPDFPage = async (file: File, page: number) => {
+    const tryLoadCachedOrStatic = async () => {
+      const isDynamic = /^pdf-/.test(bookId);
       try {
-        console.log('PDFViewer: renderPDFPage - file type:', typeof file, 'instanceof File:', file instanceof File);
-        console.log('PDFViewer: file instanceof Blob:', file instanceof Blob);
-        console.log('PDFViewer: file properties:', Object.keys(file));
-        console.log('PDFViewer: file value:', file);
-        
-        // Check if we have a valid File/Blob object
+        const cached = await getPageStorage().getPage(bookId, pageNumber);
+        if (cached) {
+          setImageUrl(cached);
+          onPageLoad?.(cached);
+          setLoading(false);
+        } else {
+          if (isDynamic) {
+            // No cached preview for dynamic books
+            setLoading(false);
+          } else {
+            console.log('PDFViewer: Tentando carregar imagens estáticas');
+            await loadStaticImages();
+          }
+        }
+      } catch {
+        if (isDynamic) {
+          setLoading(false);
+        } else {
+          await loadStaticImages();
+        }
+      }
+    };
+
+    const renderPDFPage = async (file: Blob, page: number) => {
+      try {
+        console.log('PDFViewer: renderPDFPage - file type:', typeof file, 'instanceof Blob:', file instanceof Blob);
+
+        // Check if we have a valid Blob object
         if (!file || (typeof file !== 'object') || !(file instanceof Blob)) {
-          throw new Error(`Invalid file object. Expected File/Blob, got: ${typeof file}`);
+          throw new Error(`Invalid file object. Expected Blob, got: ${typeof file}`);
         }
         
         let arrayBuffer: ArrayBuffer;
